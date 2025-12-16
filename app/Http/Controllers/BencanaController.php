@@ -16,7 +16,10 @@ class BencanaController extends Controller
             ->get();
 
         return Inertia::render('bencana/berlangsung', [
-            'bencana' => $bencana
+            'bencana' => $bencana->map(function ($item) {
+                logger()->info('Bencana Berlangsung Lokasi Data (Controller):', ['id' => $item->id, 'tipe_lokasi' => $item->tipe_lokasi, 'lokasi_data' => $item->lokasi_data]);
+                return $item;
+            })
         ]);
     }
 
@@ -51,6 +54,8 @@ class BencanaController extends Controller
             'keterangan' => 'required|string',
             'foto' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
         ]);
+
+        logger()->info('Store Bencana Lokasi Data:', ['tipe_lokasi' => $validated['tipe_lokasi'], 'lokasi_data' => $validated['lokasi_data']]);
 
         // Handle file upload
         $fotoPath = null;
@@ -90,6 +95,8 @@ class BencanaController extends Controller
             'keterangan' => 'required|string',
             'foto' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
         ]);
+
+        logger()->info('Update Bencana Lokasi Data:', ['tipe_lokasi' => $validated['tipe_lokasi'], 'lokasi_data' => $validated['lokasi_data']]);
 
         // Handle file upload
         $fotoPath = $bencana->foto;
@@ -151,7 +158,7 @@ class BencanaController extends Controller
         
         if ($status === 'berlangsung') {
             $query->berlangsung();
-        } elseif ($status === 'selesai') {
+        } elseif ($status === 'riwayat') {
             $query->selesai();
         }
         

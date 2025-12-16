@@ -39,7 +39,7 @@ export default function EditRumah({ rumah }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('data-kependudukan.rumah.update', rumah.id), {
+        put(route('data-kependudukan.rumah.update', { id: rumah.id }), {
             onSuccess: () => {
                 toast.success("Berhasil", {
                     description: "Rumah berhasil diperbarui.",

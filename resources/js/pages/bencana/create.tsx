@@ -8,6 +8,7 @@ import { DESA_SOMAGEDE_CENTER, DESA_SOMAGEDE_BOUNDARY } from '@/data/mockMapEven
 import { Head, Link, useForm } from '@inertiajs/react';
 import MapLegend from '@/components/maps/MapLegend';
 import { createDisasterIcon, getFacilityIconSVG } from '@/lib/map-icons';
+import PolygonDrawer from '@/components/maps/PolygonDrawer';
 
 const tingkatBahayaMapColors: { [key: string]: string } = {
     rendah: '#22c55e',      // green-500
@@ -48,88 +49,7 @@ function PointMarker({ onLocationSelect, disasterType, dangerLevel }: { onLocati
     return position ? <Marker key={`${disasterType}-${dangerLevel}`} position={position} icon={createDisasterIcon(disasterType, dangerLevel)} /> : null;
 }
 
-// Component for polygon drawing
-function PolygonDrawer({ onPolygonComplete, color }: {
-    onPolygonComplete: (coords: [number, number][]) => void;
-    color: string;
-}) {
-    const map = useMap();
-    const [points, setPoints] = useState<L.LatLng[]>([]);
-    const [markers, setMarkers] = useState<L.CircleMarker[]>([]);
-    const [polygon, setPolygon] = useState<L.Polygon | null>(null);
 
-    useEffect(() => {
-        const handleClick = (e: L.LeafletMouseEvent) => {
-            const newPoint = e.latlng;
-            setPoints(prev => {
-                const updated = [...prev, newPoint];
-
-                const marker = L.circleMarker(newPoint, {
-                    radius: 5,
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 1,
-                }).addTo(map);
-                setMarkers(prevMarkers => [...prevMarkers, marker]);
-
-                if (updated.length >= 3) {
-                    if (polygon) {
-                        polygon.setLatLngs(updated);
-                    } else {
-                        const newPolygon = L.polygon(updated, {
-                            color: color,
-                            fillColor: color,
-                            fillOpacity: 0.4,
-                        }).addTo(map);
-                        setPolygon(newPolygon);
-                    }
-                }
-
-                return updated;
-            });
-        };
-
-        map.on('click', handleClick);
-        return () => {
-            map.off('click', handleClick);
-        };
-    }, [map, polygon, color]);
-
-    const finishDrawing = () => {
-        if (points.length >= 3) {
-            const coords = points.map(p => [p.lat, p.lng] as [number, number]);
-            coords.push(coords[0]);
-            onPolygonComplete(coords);
-        }
-        clearDrawing();
-    };
-
-    const clearDrawing = () => {
-        markers.forEach(m => map.removeLayer(m));
-        setMarkers([]);
-        if (polygon) {
-            map.removeLayer(polygon);
-            setPolygon(null);
-        }
-        setPoints([]);
-    };
-
-    return (
-        <div className="leaflet-top leaflet-left" style={{ marginTop: '10px', marginLeft: '10px', zIndex: 1000 }}>
-            <div className="leaflet-control leaflet-bar bg-white p-2 rounded shadow-md">
-                <p className="text-xs font-medium mb-2">Klik peta untuk menambah titik ({points.length} titik)</p>
-                <div className="flex gap-2">
-                    <Button onClick={finishDrawing} size="sm" disabled={points.length < 3}>
-                        Selesai
-                    </Button>
-                    <Button onClick={clearDrawing} size="sm" variant="outline">
-                        Hapus
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 // Component for radius circle
 function RadiusCircle({ onRadiusComplete, color }: {
@@ -212,11 +132,12 @@ type Bencana = {
     tanggal_selesai?: string;
     status: 'berlangsung' | 'selesai';
     tingkat_bahaya: 'rendah' | 'sedang' | 'tinggi' | 'sangat_tinggi';
-    korban_jiwa: number | string;
-    korban_luka: number | string;
+    korban_jiwa: number | null;
+    korban_luka: number | null;
     kerusakan_infrastruktur: string;
     keterangan: string;
     warna_penanda: string;
+    luas?: string | null;
 }
 
 interface Props {
@@ -276,7 +197,16 @@ export default function CreateBencana({ bencana }: Props) {
         nama_bencana: bencana?.nama_bencana || '',
         jenis_bencana: bencana?.jenis_bencana || 'banjir',
         tipe_lokasi: bencana?.tipe_lokasi || 'titik',
-        lokasi_data: bencana?.lokasi_data || null,
+        lokasi_data: (() => {
+            if (bencana?.lokasi_data) {
+                if (bencana.tipe_lokasi === 'polygon' && !Array.isArray(bencana.lokasi_data)) {
+                    // If it's a polygon but stored as a single point, convert it to an array of arrays
+                    const point = bencana.lokasi_data as Point;
+                    return [[point.lat, point.lng]];
+                }
+            }
+            return bencana?.lokasi_data || null;
+        })(),
         luas: bencana?.luas || null,
         tanggal_mulai: bencana?.tanggal_mulai ? new Date(bencana.tanggal_mulai).toISOString().slice(0, 16) : '',
         tanggal_selesai: bencana?.tanggal_selesai ? new Date(bencana.tanggal_selesai).toISOString().slice(0, 16) : '',
@@ -290,11 +220,19 @@ export default function CreateBencana({ bencana }: Props) {
         foto: null as File | null,
     });
 
+    useEffect(() => {
+        // Reset lokasi_data when tipe_lokasi changes
+        setData('lokasi_data', null);
+    }, [data.tipe_lokasi]);
+
+
+
     const handlePointSelect = (lat: number, lng: number) => {
         setData('lokasi_data', { lat, lng });
     };
 
     const handlePolygonComplete = (coords: [number, number][]) => {
+        console.log('Polygon completed with coords:', coords);
         setData('lokasi_data', coords);
     };
 
@@ -339,7 +277,7 @@ export default function CreateBencana({ bencana }: Props) {
         e.preventDefault();
 
         if (isEdit) {
-            put(route('bencana.update', bencana.id), {
+            put(route('bencana.update', { id: bencana.id }), {
                 onSuccess: () => {
                     toast.success("Berhasil", {
                         description: "Data bencana berhasil diperbarui.",
@@ -425,13 +363,13 @@ export default function CreateBencana({ bencana }: Props) {
                                 </Select>
                             </div>
 
-                            {(data.tipe_lokasi === 'polygon' || data.tipe_lokasi === 'radius') && data.lokasi_data && (
+                            {(data.tipe_lokasi === 'polygon' || data.tipe_lokasi === 'radius') && (
                                 <div className="space-y-2">
                                     <Label>Luas Area</Label>
                                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                                         <p className="text-sm font-medium text-blue-900">
-                                            {data.tipe_lokasi === 'polygon' && calculatePolygonArea(data.lokasi_data as [number, number][])}
-                                            {data.tipe_lokasi === 'radius' && calculateRadiusArea(data.lokasi_data as any)}
+                                            {data.tipe_lokasi === 'polygon' && data.lokasi_data ? calculatePolygonArea(data.lokasi_data as [number, number][]) : 'Belum ada data lokasi'}
+                                            {data.tipe_lokasi === 'radius' && data.lokasi_data ? calculateRadiusArea(data.lokasi_data as any) : 'Belum ada data lokasi'}
                                         </p>
                                     </div>
                                 </div>
@@ -497,8 +435,8 @@ export default function CreateBencana({ bencana }: Props) {
                                         id="korban_jiwa"
                                         type="number"
                                         min="0"
-                                        value={data.korban_jiwa}
-                                        onChange={e => setData('korban_jiwa', e.target.value === '' ? null : parseInt(e.target.value))}
+                                        value={data.korban_jiwa === null ? '' : String(data.korban_jiwa)}
+                                        onChange={e => setData('korban_jiwa', e.target.value === '' ? 0 : parseInt(e.target.value))}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -507,8 +445,8 @@ export default function CreateBencana({ bencana }: Props) {
                                         id="korban_luka"
                                         type="number"
                                         min="0"
-                                        value={data.korban_luka}
-                                        onChange={e => setData('korban_luka', e.target.value === '' ? null : parseInt(e.target.value))}
+                                        value={data.korban_luka === null ? '' : String(data.korban_luka)}
+                                        onChange={e => setData('korban_luka', e.target.value === '' ? 0 : parseInt(e.target.value))}
                                     />
                                 </div>
                             </div>
@@ -617,24 +555,59 @@ export default function CreateBencana({ bencana }: Props) {
                                     />
                                 )}
 
-                                {data.tipe_lokasi === 'titik' && <PointMarker onLocationSelect={handlePointSelect} disasterType={data.jenis_bencana} dangerLevel={data.tingkat_bahaya} />}
-                                {data.tipe_lokasi === 'polygon' && (
-                                    <>
-                                        <PolygonDrawer onPolygonComplete={handlePolygonComplete} color={data.warna_penanda} />
-                                        {Array.isArray(data.lokasi_data) && data.lokasi_data.length > 0 && (
-                                            <Polygon
-                                                positions={data.lokasi_data}
-                                                pathOptions={{
-                                                    color: data.warna_penanda,
-                                                    fillColor: data.warna_penanda,
-                                                    fillOpacity: 0.4,
-                                                    weight: 2,
-                                                }}
-                                            />
-                                        )}
-                                    </>
-                                )}
-                                {data.tipe_lokasi === 'radius' && <RadiusCircle onRadiusComplete={handleRadiusComplete} color={data.warna_penanda} />}
+                                    {data.tipe_lokasi === 'polygon' && data.lokasi_data && (
+                                        <Polygon
+                                            positions={data.lokasi_data as L.LatLngTuple[]}
+                                            pathOptions={{
+                                                color: data.warna_penanda,
+                                                fillColor: data.warna_penanda,
+                                                fillOpacity: 0.4,
+                                                weight: 2,
+                                            }}
+                                        />
+                                    )}
+
+                                    {data.tipe_lokasi === 'radius' && data.lokasi_data && (
+                                        <Circle
+                                            center={(data.lokasi_data as Radius).center}
+                                            radius={(data.lokasi_data as Radius).radius}
+                                            pathOptions={{
+                                                color: data.warna_penanda,
+                                                fillColor: data.warna_penanda,
+                                                fillOpacity: 0.4,
+                                            }}
+                                        />
+                                    )}
+
+                                    {data.tipe_lokasi === 'titik' && data.lokasi_data && (
+                                        <Marker
+                                            position={data.lokasi_data as Point}
+                                            icon={createDisasterIcon(data.jenis_bencana, data.tingkat_bahaya)}
+                                        />
+                                    )}
+
+                                    {data.tipe_lokasi === 'titik' && (
+                                        <PointMarker
+                                            onLocationSelect={handlePointSelect}
+                                            disasterType={data.jenis_bencana}
+                                            dangerLevel={data.tingkat_bahaya}
+                                        />
+                                    )}
+
+                                    {data.tipe_lokasi === 'polygon' && (
+                                        <PolygonDrawer
+                                            onPolygonComplete={handlePolygonComplete}
+                                            color={data.warna_penanda}
+                                            opacity={0.4}
+                                        />
+                                    )}
+
+                                    {data.tipe_lokasi === 'radius' && (
+                                        <RadiusCircle
+                                            onRadiusComplete={handleRadiusComplete}
+                                            color={data.warna_penanda}
+                                        />
+                                    )}
                                 <MapLegend
                                     title="Legenda Bencana"
                                     items={[{

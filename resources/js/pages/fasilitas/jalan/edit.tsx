@@ -129,7 +129,7 @@ const FasilitasJalanEdit: React.FC<FasilitasEditProps> = ({ auth, fasilitas, des
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('fasilitas.update', fasilitas.id));
+        put(route('fasilitas.update', { id: fasilitas.id }));
     };
 
     const maxBounds = DESA_SOMAGEDE_BOUNDARY ? L.latLngBounds(DESA_SOMAGEDE_BOUNDARY) : undefined;

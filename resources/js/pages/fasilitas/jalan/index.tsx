@@ -10,6 +10,8 @@ import L from 'leaflet';
 import { DESA_SOMAGEDE_CENTER, DESA_SOMAGEDE_BOUNDARY } from '@/data/mockMapEvents';
 import { fixLeafletDefaultIcon } from '@/lib/leaflet-utils';
 import MapLegend from '@/components/maps/MapLegend';
+import { Eye } from 'lucide-react';
+import { getRoadColor } from '@/lib/road-utils';
 
 fixLeafletDefaultIcon();
 
@@ -50,7 +52,7 @@ const FasilitasJalanIndex: React.FC<FasilitasIndexProps> = ({ auth, fasilitas, t
 
     const handleDelete = (id: number) => {
         if (confirm('Apakah Anda yakin ingin menghapus data jalan ini?')) {
-            router.delete(route('fasilitas.destroy', id), {
+            router.delete(route('fasilitas.destroy', { id: id }), {
                 onSuccess: () => {
                     router.visit(route('fasilitas.index', { tipe: tipeAkses }));
                 },
@@ -235,7 +237,7 @@ const FasilitasJalanIndex: React.FC<FasilitasIndexProps> = ({ auth, fasilitas, t
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.keterangan || '-'}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
-                                                        <Link href={route('fasilitas.show', item.id)}>
+                                                        <Link href={route('fasilitas.show', { id: item.id })}>
                                                             <Button size="sm" variant="outline">
                                                                 <Eye className="h-4 w-4 mr-1" />
                                                                 Detail

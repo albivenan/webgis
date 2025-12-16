@@ -201,7 +201,7 @@ export default function LokasiPenduduk({ rumah = [], penduduk = [] }: Props) {
     const handleConfirmDelete = () => {
         if (!rumahToDelete) return;
 
-        router.delete(route('data-kependudukan.rumah.destroy', rumahToDelete.id), {
+        router.delete(route('data-kependudukan.rumah.destroy', { id: rumahToDelete.id }), {
             onSuccess: () => {
                 toast.success("Berhasil", {
                     description: "Lokasi rumah berhasil dihapus.",
@@ -397,7 +397,7 @@ export default function LokasiPenduduk({ rumah = [], penduduk = [] }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex gap-1">
-                                                        <Link href={route('data-kependudukan.rumah.show', item.id)}>
+                                                        <Link href={route('data-kependudukan.rumah.show', { id: item.id })}>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"

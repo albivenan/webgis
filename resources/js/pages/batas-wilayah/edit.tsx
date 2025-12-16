@@ -124,13 +124,6 @@ export default function EditBatasWilayah({ batasWilayah }: { batasWilayah: Batas
         setData('coordinates', []);
     };
 
-    // Auto-set color based on jenis
-    useEffect(() => {
-        if (data.jenis && LAND_USE_COLORS[data.jenis]) {
-            setData('warna', LAND_USE_COLORS[data.jenis]);
-        }
-    }, [data.jenis]);
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         put(`/batas-wilayah/${batasWilayah.id}`);

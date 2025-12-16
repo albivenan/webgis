@@ -168,7 +168,7 @@ const FasilitasEdit: React.FC<FasilitasEditProps> = ({ auth, fasilitas, desa, ti
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('fasilitas.update', fasilitas.id));
+        put(route('fasilitas.update', { id: fasilitas.id }));
     };
 
     const initialCenter: L.LatLngExpression = markerPosition || DESA_SOMAGEDE_CENTER;

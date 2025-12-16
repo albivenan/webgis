@@ -74,7 +74,7 @@ const FasilitasShow: React.FC<FasilitasShowProps> = ({ auth, fasilitas }) => {
                                 <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
                             </Button>
                         </Link>
-                        <Link href={route('fasilitas.edit', fasilitas.id)}>
+                        <Link href={route('fasilitas.edit', { id: fasilitas.id })}>
                             <Button>
                                 <Edit className="mr-2 h-4 w-4" /> Edit Fasilitas
                             </Button>

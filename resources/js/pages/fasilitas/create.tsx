@@ -483,7 +483,7 @@ const FasilitasCreate: React.FC<FasilitasCreateProps> = ({ auth, desa, tipeAkses
                                             )}
                                             {isRoadType ? (
                                                 <LayersControl.Overlay checked name="Jalur Jalan">
-                                                    <PolylineDrawer onPolylineComplete={handlePolylineComplete} existingPolyline={polylineCoords} />
+                                                    <PolylineDrawer onPolylineComplete={handlePolylineComplete} existingPolyline={polylineCoords} color="#FF0000" />
                                                 </LayersControl.Overlay>
                                             ) : (
                                                 markerPosition && (

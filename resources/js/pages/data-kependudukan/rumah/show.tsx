@@ -27,7 +27,7 @@ interface Rumah {
 export default function RumahShow({ rumah }: { rumah: Rumah }) {
     const handleDelete = () => {
         if (confirm('Apakah Anda yakin ingin menghapus rumah ini?')) {
-            router.delete(route('data-kependudukan.rumah.destroy', rumah.id), {
+            router.delete(route('data-kependudukan.rumah.destroy', { id: rumah.id }), {
                 onSuccess: () => {
                     router.visit(route('data-kependudukan.rumah.index'));
                 }
@@ -50,7 +50,7 @@ export default function RumahShow({ rumah }: { rumah: Rumah }) {
                         <p className="text-muted-foreground">Detail informasi rumah penduduk</p>
                     </div>
                     <div className="flex gap-2">
-                        <Link href={route('data-kependudukan.rumah.edit', rumah.id)}>
+                        <Link href={route('data-kependudukan.rumah.edit', { id: rumah.id })}>
                             <Button>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
                             </Button>

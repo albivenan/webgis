@@ -9,6 +9,7 @@ import { getFacilityIconSVG, createFacilityIcon, createDisasterIcon } from '@/li
 import MarkerPopupContent from '@/components/maps/MarkerPopupContent';
 import { Button } from '../ui/button';
 import { Link } from '@inertiajs/react';
+import { LAND_USE_COLORS, landUseTypes, tingkatBahayaMapColors } from '@/lib/map-constants';
 
 interface LegendItem {
     label: string;
@@ -172,46 +173,58 @@ export default function MapView({
         }
 
         if (activeLayers.includes('batas-wilayah') && batasWilayah.length > 0) {
-            items.push({
-                label: 'Batas Wilayah',
-                color: '#2563eb',
-                type: 'line' // Representing the polygon outline
+            items.push({ label: 'Batas Wilayah', color: 'transparent', type: 'point' });
+            landUseTypes.forEach(type => {
+                items.push({
+                    label: type,
+                    color: LAND_USE_COLORS[type] || '#000000',
+                    type: 'point',
+                });
             });
         }
+
 
         if (activeLayers.includes('tragedi-berlangsung') && bencanaBerlangsung.length > 0) {
-            const uniqueDisasters = [...new Set(bencanaBerlangsung.map(b => `${b.jenis_bencana}-${b.tingkat_bahaya}`))];
-            uniqueDisasters.forEach(disaster => {
-                const [jenis_bencana, tingkat_bahaya] = disaster.split('-');
-                let color = '#ef4444'; // Default for 'sangat_tinggi'
-                if (tingkat_bahaya === 'rendah') color = '#22c55e';
-                else if (tingkat_bahaya === 'sedang') color = '#facc15';
-                else if (tingkat_bahaya === 'tinggi') color = '#f97316';
-
+            // Ambil jenis bencana sampel untuk ikon legenda
+            const sampleJenisBencana = bencanaBerlangsung[0]?.jenis_bencana || 'default';
+            items.push({
+                label: 'Tragedi Berlangsung',
+                color: 'transparent',
+                type: 'point',
+                iconHtml: createDisasterIcon(sampleJenisBencana, 'tinggi').options.html
+            });
+            const uniqueSeverities = [...new Set(bencanaBerlangsung.map(b => b.tingkat_bahaya))];
+            uniqueSeverities.forEach(tingkat_bahaya => {
                 items.push({
-                    label: `Tragedi Berlangsung (${jenis_bencana.replace(/_/g, ' ')} - ${tingkat_bahaya.replace(/_/g, ' ')})`,
-                    color: color,
-                    iconHtml: createDisasterIcon(jenis_bencana, tingkat_bahaya).options.html
+                    label: tingkat_bahaya.replace(/_/g, ' '),
+                    color: tingkatBahayaMapColors[tingkat_bahaya] || '#71717a',
+                    type: 'point',
+                    iconHtml: createDisasterIcon(sampleJenisBencana, tingkat_bahaya).options.html
                 });
             });
         }
+
 
         if (activeLayers.includes('riwayat-tragedi') && bencanaRiwayat.length > 0) {
-            const uniqueDisasters = [...new Set(bencanaRiwayat.map(b => `${b.jenis_bencana}-${b.tingkat_bahaya}`))];
-            uniqueDisasters.forEach(disaster => {
-                const [jenis_bencana, tingkat_bahaya] = disaster.split('-');
-                let color = '#71717a'; // Default for 'sangat_tinggi'
-                if (tingkat_bahaya === 'rendah') color = '#22c55e';
-                else if (tingkat_bahaya === 'sedang') color = '#facc15';
-                else if (tingkat_bahaya === 'tinggi') color = '#f97316';
-
+            // Ambil jenis bencana sampel untuk ikon legenda
+            const sampleJenisBencana = bencanaRiwayat[0]?.jenis_bencana || 'default';
+            items.push({
+                label: 'Riwayat Tragedi',
+                color: 'transparent',
+                type: 'point',
+                iconHtml: createDisasterIcon(sampleJenisBencana, 'tinggi').options.html
+            });
+            const uniqueSeverities = [...new Set(bencanaRiwayat.map(b => b.tingkat_bahaya))];
+            uniqueSeverities.forEach(tingkat_bahaya => {
                 items.push({
-                    label: `Riwayat Tragedi (${jenis_bencana.replace(/_/g, ' ')} - ${tingkat_bahaya.replace(/_/g, ' ')})`,
-                    color: color,
-                    iconHtml: createDisasterIcon(jenis_bencana, tingkat_bahaya).options.html
+                    label: tingkat_bahaya.replace(/_/g, ' '),
+                    color: tingkatBahayaMapColors[tingkat_bahaya] || '#71717a',
+                    type: 'point',
+                    iconHtml: createDisasterIcon(sampleJenisBencana, tingkat_bahaya).options.html
                 });
             });
         }
+
 
         return items;
     };
@@ -407,41 +420,185 @@ export default function MapView({
                 <LayersControl.Overlay checked={activeLayers.includes('batas-wilayah')} name="Batas Wilayah">
                     <LayerGroup>
                         {batasWilayah.map((item) => {
-                            // Convert [lat, lng] to [lng, lat] for GeoJSON
-                            const geoCoordinates = item.coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
-                            const geoData: GeoJSON.Polygon = {
-                                type: "Polygon",
-                                coordinates: [geoCoordinates]
-                            };
+                            if (!item.coordinates || item.coordinates.length === 0) return null;
+                            const polygonCenter = L.latLngBounds(item.coordinates).getCenter();
 
                             return (
-                                <GeoJSON
-                                    key={`batas-wilayah-${item.id}`}
-                                    data={geoData}
-                                    style={{
-                                        color: item.warna || '#3388ff',
-                                        weight: 2,
-                                        opacity: item.opacity || 0.7,
-                                        fillColor: item.warna || '#3388ff',
-                                        fillOpacity: item.opacity ? item.opacity * 0.5 : 0.35,
-                                    }}
-                                >
-                                    <Popup>
-                                        <div className="p-2 min-w-[220px]">
-                                            <h3 className="font-bold text-sm mb-2">{item.nama}</h3>
-                                            <div className="text-xs space-y-1 mb-3">
-                                                <p><span className="font-semibold">Jenis:</span> {item.jenis}</p>
-                                                {item.nama_pemilik && <p><span className="font-semibold">Pemilik:</span> {item.nama_pemilik}</p>}
-                                                {item.luas && <p><span className="font-semibold">Luas:</span> {(item.luas / 10000).toFixed(2)} ha</p>}
-                                                {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
+                                <React.Fragment key={`batas-wilayah-group-${item.id}`}>
+                                    <Polygon
+                                        positions={item.coordinates}
+                                        pathOptions={{
+                                            color: LAND_USE_COLORS[item.jenis] || '#3388ff',
+                                            fillColor: LAND_USE_COLORS[item.jenis] || '#3388ff',
+                                            fillOpacity: 0.5,
+                                            weight: 2
+                                        }}
+                                    >
+                                        <Popup>
+                                            <div className="p-2 min-w-[220px]">
+                                                <h3 className="font-bold text-sm mb-2">{item.nama}</h3>
+                                                <div className="text-xs space-y-1 mb-3">
+                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis}</p>
+                                                    {item.nama_pemilik && <p><span className="font-semibold">Pemilik:</span> {item.nama_pemilik}</p>}
+                                                    {item.luas && <p><span className="font-semibold">Luas:</span> {(item.luas / 10000).toFixed(2)} ha</p>}
+                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
+                                                </div>
+                                                <Link href={route('batas-wilayah.index')}>
+                                                    <Button size="sm" className="w-full">Detail</Button>
+                                                </Link>
                                             </div>
-                                            <Link href={route('batas-wilayah.index')}>
-                                                <Button size="sm" className="w-full">Detail</Button>
-                                            </Link>
-                                        </div>
-                                    </Popup>
-                                </GeoJSON>
+                                        </Popup>
+                                        <Tooltip>{item.nama}</Tooltip>
+                                    </Polygon>
+                                    <Marker position={polygonCenter} icon={createFacilityIcon(item.jenis)} />
+                                </React.Fragment>
                             );
+                        })}
+                    </LayerGroup>
+                </LayersControl.Overlay>
+
+
+
+                {/* Riwayat Tragedi */}
+                <LayersControl.Overlay name="Riwayat Tragedi">
+                    <LayerGroup>
+                        {bencanaRiwayat.map((item) => {
+                            const color = tingkatBahayaMapColors[item.tingkat_bahaya] || '#71717a';
+                            const parsedLokasiData = parseGeoJSON(item.lokasi_data);
+                            const isPoint = item.tipe_lokasi === 'titik' || item.tipe_lokasi === 'point';
+
+                            if (isPoint && parsedLokasiData && (parsedLokasiData.lat || Array.isArray(parsedLokasiData))) {
+                                const lat = parsedLokasiData.lat ?? parsedLokasiData[0];
+                                const lng = parsedLokasiData.lng ?? parsedLokasiData[1];
+                                return (
+                                    <Marker
+                                        key={`bencana-riwayat-marker-${item.id}`}
+                                        position={[lat, lng]}
+                                        icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                    >
+                                        <Tooltip>{item.nama_bencana}</Tooltip>
+                                        <Popup>
+                                            <div className="p-2 min-w-[220px]">
+                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
+                                                <div className="text-xs space-y-1 mb-3">
+                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                    <p><span className="font-semibold">Tanggal Mulai:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
+                                                    {item.tanggal_selesai && (
+                                                        <p><span className="font-semibold">Tanggal Selesai:</span> {new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}</p>
+                                                    )}
+                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
+                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
+                                                </div>
+                                                <Link href={route('bencana.riwayat')}>
+                                                    <Button size="sm" className="w-full">Detail</Button>
+                                                </Link>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                );
+                            }
+                            else if (item.tipe_lokasi === 'radius' && parsedLokasiData?.center && parsedLokasiData?.radius) {
+                                const centerLat = parsedLokasiData.center.lat ?? parsedLokasiData.center[0];
+                                const centerLng = parsedLokasiData.center.lng ?? parsedLokasiData.center[1];
+
+                                if (centerLat == null || centerLng == null) return null;
+
+                                return (
+                                    <React.Fragment key={`bencana-riwayat-radius-fragment-${item.id}`}>
+                                        <Circle
+                                            key={`bencana-riwayat-${item.id}`}
+                                            center={[centerLat, centerLng]}
+                                            radius={parsedLokasiData.radius}
+                                            pathOptions={{
+                                                color: color,
+                                                fillColor: color,
+                                                fillOpacity: 0.15,
+                                                weight: 2
+                                            }}
+                                        >
+                                            <Popup>
+                                                <div className="p-2 min-w-[220px]">
+                                                    <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
+                                                    <div className="text-xs space-y-1 mb-3">
+                                                        <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                        <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
+                                                        <p><span className="font-semibold">Radius:</span> {parsedLokasiData.radius}m</p>
+                                                    </div>
+                                                </div>
+                                            </Popup>
+                                        </Circle>
+                                        <Marker
+                                            key={`bencana-riwayat-radius-marker-${item.id}`}
+                                            position={[centerLat, centerLng]}
+                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                        >
+                                            <Popup>
+                                                <MarkerPopupContent
+                                                    name={item.nama_bencana}
+                                                    type="bencana"
+                                                    id={item.id}
+                                                    additionalInfo={[
+                                                        { label: 'Jenis', value: item.jenis_bencana.replace(/_/g, ' ') },
+                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                        { label: 'Radius', value: `${parsedLokasiData.radius}m` },
+                                                    ]}
+                                                />
+                                            </Popup>
+                                        </Marker>
+                                    </React.Fragment>
+                                );
+                            }
+                            else if (item.tipe_lokasi === 'polygon' && parsedLokasiData && Array.isArray(parsedLokasiData)) {
+                                const polygonPositions = parsedLokasiData.map((coord: any) => Array.isArray(coord) ? coord : [coord.lat, coord.lng]);
+
+                                if (polygonPositions.length === 0) return null;
+
+                                const leafletPositions = polygonPositions as L.LatLngExpression[];
+                                const polygonCenter = L.latLngBounds(leafletPositions).getCenter();
+
+                                return (
+                                    <React.Fragment key={`bencana-riwayat-polygon-fragment-${item.id}`}>
+                                        <Polygon
+                                            key={`bencana-riwayat-polygon-${item.id}`}
+                                            positions={leafletPositions}
+                                            pathOptions={{ color: color, fillColor: color, fillOpacity: 0.4, weight: 2 }}
+                                        >
+                                            <Popup>
+                                                <MarkerPopupContent
+                                                    name={item.nama_bencana}
+                                                    type="bencana"
+                                                    id={item.id}
+                                                    imageUrl={item.foto}
+                                                    additionalInfo={[
+                                                        { label: 'Jenis', value: item.jenis_bencana },
+                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya },
+                                                        { label: 'Status', value: item.status },
+                                                    ]}
+                                                />
+                                            </Popup>
+                                        </Polygon>
+                                        <Marker
+                                            key={`bencana-riwayat-polygon-marker-${item.id}`}
+                                            position={polygonCenter}
+                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                        >
+                                            <Popup>
+                                                <MarkerPopupContent
+                                                    name={item.nama_bencana}
+                                                    type="bencana"
+                                                    id={item.id}
+                                                    imageUrl={item.foto}
+                                                    additionalInfo={[
+                                                        { label: 'Jenis', value: item.jenis_bencana },
+                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya },
+                                                    ]}
+                                                />
+                                            </Popup>
+                                        </Marker>
+                                    </React.Fragment>
+                                );
+                            }
+                            return null;
                         })}
                     </LayerGroup>
                 </LayersControl.Overlay>
@@ -450,218 +607,100 @@ export default function MapView({
                 <LayersControl.Overlay checked={activeLayers.includes('tragedi-berlangsung')} name="Tragedi Berlangsung">
                     <LayerGroup>
                         {bencanaBerlangsung.map((item) => {
-                            const color = item.warna_penanda || '#ef4444';
-                            // Handle different location types
-                            if (item.tipe_lokasi === 'titik' && item.lokasi_data?.lat && item.lokasi_data?.lng) {
+                            const color = tingkatBahayaMapColors[item.tingkat_bahaya] || '#71717a'; // default to gray
+                            if (item.tipe_lokasi === 'point' && item.lokasi_data && item.lokasi_data.lat && item.lokasi_data.lng) {
                                 return (
-                                    <Circle
-                                        key={`bencana-berlangsung-${item.id}`}
-                                        center={[item.lokasi_data.lat, item.lokasi_data.lng]}
-                                        radius={50}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.4
-                                        }}
+                                    <Marker
+                                        key={`berlangsung-tragedi-marker-${item.id}`}
+                                        position={[item.lokasi_data.lat, item.lokasi_data.lng]}
+                                        icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
                                     >
                                         <Tooltip>{item.nama_bencana}</Tooltip>
-                                        <Marker
-                                            position={[item.lokasi_data.lat, item.lokasi_data.lng]}
-                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
-                                        />
                                         <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.berlangsung')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                    </Circle>
-                                );
-                            }
-                            if (item.tipe_lokasi === 'radius' && item.lokasi_data?.center && item.lokasi_data?.radius) {
-                                return (
-                                    <Circle
-                                        key={`bencana-berlangsung-${item.id}`}
-                                        center={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]}
-                                        radius={item.lokasi_data.radius}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.2
-                                        }}
-                                    >
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Radius:</span> {item.lokasi_data.radius}m</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.berlangsung')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                    </Circle>
-                                );
-                            }
-                            if (item.tipe_lokasi === 'polygon' && item.lokasi_data && Array.isArray(item.lokasi_data)) {
-                                return (
-                                    <Polygon
-                                        key={`bencana-berlangsung-${item.id}`}
-                                        positions={item.lokasi_data}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.2
-                                        }}
-                                    >
-                                        <Tooltip>{item.nama_bencana}</Tooltip>
-                                        {item.lokasi_data && item.lokasi_data.length > 0 && (
-                                            <Marker
-                                                position={item.lokasi_data[0]}
-                                                icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                            <MarkerPopupContent
+                                                name={item.nama_bencana}
+                                                type="bencana"
+                                                id={item.id}
+                                                imageUrl={item.foto_bencana}
+                                                additionalInfo={[
+                                                    { label: 'Jenis Bencana', value: item.jenis_bencana },
+                                                    { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                    { label: 'Status', value: item.status },
+                                                    { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
+                                                    ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
+                                                ]}
                                             />
-                                        )}
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.berlangsung')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
                                         </Popup>
-                                    </Polygon>
+                                    </Marker>
                                 );
-                            }
-                            return null;
-                        })}
-                    </LayerGroup>
-                </LayersControl.Overlay>
+                            } else if (item.tipe_lokasi === 'polygon' && Array.isArray(item.lokasi_data)) {
+                                const polygonPositions = item.lokasi_data.map((coord: number[]) => [coord[0], coord[1]]); // Assuming [lat, lng]
+                                const polygonCenter = L.latLngBounds(polygonPositions).getCenter();
 
-                {/* Riwayat Tragedi */}
-                <LayersControl.Overlay checked={activeLayers.includes('riwayat-tragedi')} name="Riwayat Tragedi">
-                    <LayerGroup>
-                        {bencanaRiwayat.map((item) => {
-                            const color = item.warna_penanda || '#71717a';
-                            // Handle different location types
-                            if (item.tipe_lokasi === 'titik' && item.lokasi_data?.lat && item.lokasi_data?.lng) {
                                 return (
-                                    <Circle
-                                        key={`bencana-riwayat-${item.id}`}
-                                        center={[item.lokasi_data.lat, item.lokasi_data.lng]}
-                                        radius={50}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.3
-                                        }}
-                                    >
-                                        <Tooltip>{item.nama_bencana}</Tooltip>
-                                        <Marker
-                                            position={[item.lokasi_data.lat, item.lokasi_data.lng]}
-                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
-                                        />
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal Mulai:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    {item.tanggal_selesai && (
-                                                        <p><span className="font-semibold">Tanggal Selesai:</span> {new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}</p>
-                                                    )}
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.riwayat')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                    </Circle>
+                                    <React.Fragment key={`berlangsung-tragedi-polygon-${item.id}`}>
+                                        <Polygon
+                                            positions={polygonPositions}
+                                            pathOptions={{
+                                                color: color,
+                                                fillColor: color,
+                                                fillOpacity: 0.5,
+                                                weight: 2
+                                            }}
+                                        >
+                                            <Tooltip>{item.nama_bencana}</Tooltip>
+                                            <Popup>
+                                                <MarkerPopupContent
+                                                    name={item.nama_bencana}
+                                                    type="bencana"
+                                                    id={item.id}
+                                                    imageUrl={item.foto_bencana}
+                                                    additionalInfo={[
+                                                        { label: 'Jenis Bencana', value: item.jenis_bencana },
+                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                        { label: 'Status', value: item.status },
+                                                        { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
+                                                        ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
+                                                    ]}
+                                                />
+                                            </Popup>
+                                        </Polygon>
+                                        <Marker position={polygonCenter} icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)} />
+                                    </React.Fragment>
                                 );
-                            }
-                            if (item.tipe_lokasi === 'radius' && item.lokasi_data?.center && item.lokasi_data?.radius) {
+                            } else if (item.tipe_lokasi === 'radius' && item.lokasi_data && item.lokasi_data.center && item.lokasi_data.radius) {
                                 return (
-                                    <Circle
-                                        key={`bencana-riwayat-${item.id}`}
-                                        center={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]}
-                                        radius={item.lokasi_data.radius}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.15
-                                        }}
-                                    >
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal Mulai:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    {item.tanggal_selesai && (
-                                                        <p><span className="font-semibold">Tanggal Selesai:</span> {new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}</p>
-                                                    )}
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Radius:</span> {item.lokasi_data.radius}m</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.riwayat')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                    </Circle>
-                                );
-                            }
-                            if (item.tipe_lokasi === 'polygon' && item.lokasi_data && Array.isArray(item.lokasi_data)) {
-                                return (
-                                    <Polygon
-                                        key={`bencana-riwayat-${item.id}`}
-                                        positions={item.lokasi_data}
-                                        pathOptions={{
-                                            color: color,
-                                            fillColor: color,
-                                            fillOpacity: 0.15
-                                        }}
-                                    >
-                                        <Tooltip>{item.nama_bencana}</Tooltip>
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal Mulai:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    {item.tanggal_selesai && (
-                                                        <p><span className="font-semibold">Tanggal Selesai:</span> {new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}</p>
-                                                    )}
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.riwayat')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                    </Polygon>
+                                    <React.Fragment key={`berlangsung-tragedi-radius-${item.id}`}>
+                                        <Circle
+                                            center={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]}
+                                            radius={item.lokasi_data.radius}
+                                            pathOptions={{
+                                                color: color,
+                                                fillColor: color,
+                                                fillOpacity: 0.4,
+                                                weight: 2,
+                                            }}
+                                        >
+                                            <Tooltip>{item.nama_bencana}</Tooltip>
+                                            <Popup>
+                                                <MarkerPopupContent
+                                                    name={item.nama_bencana}
+                                                    type="bencana"
+                                                    id={item.id}
+                                                    imageUrl={item.foto_bencana}
+                                                    additionalInfo={[
+                                                        { label: 'Jenis Bencana', value: item.jenis_bencana },
+                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                        { label: 'Status', value: item.status },
+                                                        { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
+                                                        ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
+                                                        { label: 'Radius', value: `${item.lokasi_data.radius}m` },
+                                                    ]}
+                                                />
+                                            </Popup>
+                                        </Circle>
+                                        <Marker position={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]} icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)} />
+                                    </React.Fragment>
                                 );
                             }
                             return null;

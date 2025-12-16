@@ -66,7 +66,7 @@ export default function Edit({ data: initialData }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('data-kependudukan.persebaran-penduduk.update', initialData.id), {
+        put(route('data-kependudukan.persebaran-penduduk.update', { id: initialData.id }), {
             onSuccess: () => {
                 toast.success("Berhasil", {
                     description: "Data persebaran penduduk berhasil diperbarui.",
@@ -101,7 +101,7 @@ export default function Edit({ data: initialData }: Props) {
         <AppLayout breadcrumbs={[
             { title: 'Data Kependudukan', href: '#' },
             { title: 'Persebaran Penduduk', href: route('data-kependudukan.persebaran-penduduk.index') },
-            { title: 'Edit Data', href: route('data-kependudukan.persebaran-penduduk.edit', initialData.id) },
+            { title: 'Edit Data', href: route('data-kependudukan.persebaran-penduduk.edit', { id: initialData.id }) },
         ]}>
             <Head title="Edit Data Persebaran Penduduk" />
 

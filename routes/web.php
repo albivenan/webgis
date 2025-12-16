@@ -113,7 +113,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
 
-    // API untuk data marker
+    // API untuk data marker (dipindahkan ke luar middleware auth)
     Route::prefix('api/markers')->group(function () {
         Route::get('lokasi-penting', [App\Http\Controllers\MarkerDataController::class, 'getLokasiPentingMarkers'])->name('api.markers.lokasi-penting');
         Route::get('fasilitas', [App\Http\Controllers\FasilitasController::class, 'apiMarkers'])->name('api.markers.fasilitas');
@@ -122,6 +122,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('batas-wilayah', [App\Http\Controllers\BatasWilayahController::class, 'apiMarkers'])->name('api.markers.batas-wilayah');
         Route::get('kartu-keluarga', [App\Http\Controllers\MarkerDataController::class, 'getKartuKeluargaMarkers'])->name('api.markers.kartu-keluarga');
     });
+
+    // Manajemen User
+    Route::get('/pengguna/daftar', [App\Http\Controllers\UserController::class, 'index'])->name('pengguna.daftar');
 
 });
 

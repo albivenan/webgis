@@ -51,7 +51,7 @@ const FasilitasIndex: React.FC<FasilitasIndexProps> = ({ auth, fasilitas, tipeAk
 
     const handleDelete = (id: number) => {
         if (confirm('Apakah Anda yakin ingin menghapus fasilitas ini?')) {
-            router.delete(route('fasilitas.destroy', id), {
+            router.delete(route('fasilitas.destroy', { id: id }), {
                 onSuccess: () => {
                     // This will cause a full page reload and re-fetch of data
                     router.visit(route('fasilitas.index', { tipe: tipeAkses }));
@@ -222,7 +222,7 @@ const FasilitasIndex: React.FC<FasilitasIndexProps> = ({ auth, fasilitas, tipeAk
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.kondisi}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex gap-2">
-                                                        <Link href={route('fasilitas.show', item.id)}>
+                                                        <Link href={route('fasilitas.show', { id: item.id })}> 
                                                             <Button size="sm" variant="outline">
                                                                 <Eye className="h-4 w-4 mr-1" />
                                                                 Detail

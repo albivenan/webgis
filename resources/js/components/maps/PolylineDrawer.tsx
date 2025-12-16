@@ -9,15 +9,40 @@ import { toast } from 'sonner';
 interface PolylineDrawerProps {
     onPolylineComplete: (coords: [number, number][]) => void;
     color: string;
+    existingPolyline?: [number, number][] | null;
 }
 
-export default function PolylineDrawer({ onPolylineComplete, color }: PolylineDrawerProps) {
+export default function PolylineDrawer({ onPolylineComplete, color, existingPolyline }: PolylineDrawerProps) {
     const map = useMap();
     const [isDrawing, setIsDrawing] = useState(false);
     const [points, setPoints] = useState<L.LatLng[]>([]);
     const [markers, setMarkers] = useState<L.CircleMarker[]>([]);
     const [polyline, setPolyline] = useState<L.Polyline | null>(null);
     const controlRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (existingPolyline && existingPolyline.length > 0) {
+            const initialPoints = existingPolyline.map(coord => L.latLng(coord[0], coord[1]));
+            setPoints(initialPoints);
+            const initialPolyline = L.polyline(initialPoints, {
+                color: color,
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+            setPolyline(initialPolyline);
+
+            initialPoints.forEach(point => {
+                const marker = L.circleMarker(point, {
+                    radius: 5,
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 1,
+                    weight: 2
+                }).addTo(map);
+                setMarkers(prevMarkers => [...prevMarkers, marker]);
+            });
+        }
+    }, [existingPolyline, map, color]);
 
     // Disable click propagation on the control to prevent map clicks
     useEffect(() => {
@@ -86,7 +111,7 @@ export default function PolylineDrawer({ onPolylineComplete, color }: PolylineDr
             map.off('click', handleClick);
             map.off('dblclick', handleDblClick);
         };
-    }, [isDrawing, points, map, polyline, color]);
+    }, [isDrawing, points, map, polyline, color, existingPolyline]);
 
     const startDrawing = () => {
         setIsDrawing(true);

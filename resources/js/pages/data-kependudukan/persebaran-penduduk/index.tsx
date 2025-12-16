@@ -85,7 +85,7 @@ export default function Index({ data, statistics, filters, rtList, rwList, tahun
 
     const handleDelete = (id: number) => {
         if (confirm('Apakah Anda yakin ingin menghapus data ini?')) {
-            router.delete(route('data-kependudukan.persebaran-penduduk.destroy', id), {
+            router.delete(route('data-kependudukan.persebaran-penduduk.destroy', { id: id }), {
                 onSuccess: () => {
                     toast.success("Berhasil", {
                         description: "Data persebaran penduduk berhasil dihapus.",
@@ -485,7 +485,7 @@ export default function Index({ data, statistics, filters, rtList, rwList, tahun
                                                         <Eye className="w-4 h-4" />
                                                     </Button>
                                                 </Link>
-                                                <Link href={route('data-kependudukan.persebaran-penduduk.edit', item.id)}>
+                                                <Link href={route('data-kependudukan.persebaran-penduduk.edit', { id: item.id })}>
                                                     <Button variant="ghost" size="icon" title="Edit">
                                                         <Pencil className="w-4 h-4" />
                                                     </Button>

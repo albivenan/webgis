@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Plus, MapPin, Home, Users, Trash2, Building, Edit } from 'lucide-react';
+import { Search, Plus, MapPin, Home, Users, Trash2, Building, Edit, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import DataListCard, { DataListColumn, DataListAction } from '@/components/maps/DataListCard';
 
@@ -180,7 +180,7 @@ export default function RumahIndex({ rumah = [] }: Props) {
     const handleConfirmDelete = () => {
         if (!rumahToDelete) return;
 
-        router.delete(route('data-kependudukan.rumah.destroy', rumahToDelete.id), {
+        router.delete(route('data-kependudukan.rumah.destroy', { id: rumahToDelete.id }), {
             onSuccess: () => {
                 toast.success("Berhasil", {
                     description: "Lokasi rumah berhasil dihapus.",
