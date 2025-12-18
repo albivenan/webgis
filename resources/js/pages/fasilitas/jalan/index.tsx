@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import BaseMapLayers from '@/components/maps/BaseMapLayers';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -200,12 +199,12 @@ const FasilitasJalanIndex: React.FC<FasilitasIndexProps> = ({ auth, fasilitas, t
                                 <MapLegend
                                     title="Jenis Jalan"
                                     items={[
-                                        { label: 'Jalan Nasional', color: '#dc2626', type: 'line' },
-                                        { label: 'Jalan Provinsi', color: '#ea580c', type: 'line' },
-                                        { label: 'Jalan Kabupaten', color: '#eab308', type: 'line' },
-                                        { label: 'Jalan Desa', color: '#16a34a', type: 'line' },
-                                        { label: 'Jalan Lingkungan', color: '#2563eb', type: 'line' },
-                                        { label: 'Jalan Setapak', color: '#9333ea', type: 'line' },
+                                        { label: 'Jalan Nasional', color: getRoadColor('jalan_nasional'), type: 'line' },
+                                        { label: 'Jalan Provinsi', color: getRoadColor('jalan_provinsi'), type: 'line' },
+                                        { label: 'Jalan Kabupaten', color: getRoadColor('jalan_kabupaten'), type: 'line' },
+                                        { label: 'Jalan Desa', color: getRoadColor('jalan_desa'), type: 'line' },
+                                        { label: 'Jalan Lingkungan', color: getRoadColor('jalan_lingkungan'), type: 'line' },
+                                        { label: 'Jalan Setapak', color: getRoadColor('jalan_setapak'), type: 'line' },
                                     ]}
                                 />
                             </MapContainer>

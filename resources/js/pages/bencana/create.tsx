@@ -1,7 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import BaseMapLayers from '@/components/maps/BaseMapLayers';
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Polygon, Circle, useMap, useMapEvents } from 'react-leaflet';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Polygon, Circle, useMap, useMapEvents, LayersControl, LayerGroup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { DESA_SOMAGEDE_CENTER, DESA_SOMAGEDE_BOUNDARY } from '@/data/mockMapEvents';
@@ -58,6 +57,15 @@ function RadiusCircle({ onRadiusComplete, color }: {
 }) {
     const [center, setCenter] = useState<L.LatLng | null>(null);
     const [radius, setRadius] = useState(100);
+    const controlRef = React.useRef<HTMLDivElement>(null);
+
+    // Disable click propagation on the control to prevent map clicks
+    useEffect(() => {
+        if (controlRef.current) {
+            L.DomEvent.disableClickPropagation(controlRef.current);
+            L.DomEvent.disableScrollPropagation(controlRef.current);
+        }
+    }, []);
 
     useMapEvents({
         click(e) {
@@ -65,7 +73,9 @@ function RadiusCircle({ onRadiusComplete, color }: {
         },
     });
 
-    const handleComplete = () => {
+    const handleComplete = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (center) {
             onRadiusComplete({ lat: center.lat, lng: center.lng }, radius);
         }
@@ -77,7 +87,7 @@ function RadiusCircle({ onRadiusComplete, color }: {
                 <>
                     <Circle
                         center={center}
-                        radius={radius}
+                        radius={isNaN(radius) || radius <= 0 ? 100 : radius}
                         pathOptions={{
                             color: color,
                             fillColor: color,
@@ -87,21 +97,34 @@ function RadiusCircle({ onRadiusComplete, color }: {
                     <Marker position={center} />
                 </>
             )}
-            <div className="leaflet-top leaflet-left" style={{ marginTop: '10px', marginLeft: '10px', zIndex: 1000 }}>
+            <div
+                ref={controlRef}
+                className="leaflet-top leaflet-left"
+                style={{ marginTop: '10px', marginLeft: '10px', zIndex: 1000 }}
+            >
                 <div className="leaflet-control leaflet-bar bg-white p-2 rounded shadow-md space-y-2">
                     <p className="text-xs font-medium">Klik peta untuk set center</p>
                     <div>
                         <Label className="text-xs">Radius: {radius}m</Label>
                         <Slider
-                            value={[radius]}
-                            onValueChange={(v) => setRadius(v[0])}
+                            value={[isNaN(radius) ? 100 : radius]}
+                            onValueChange={(v) => {
+                                if (v && v.length > 0) {
+                                    setRadius(v[0]);
+                                }
+                            }}
                             min={50}
                             max={1000}
                             step={50}
                             className="w-32"
                         />
                     </div>
-                    <Button onClick={handleComplete} size="sm" disabled={!center}>
+                    <Button
+                        type="button"
+                        onClick={handleComplete}
+                        size="sm"
+                        disabled={!center}
+                    >
                         Selesai
                     </Button>
                 </div>
@@ -147,45 +170,45 @@ interface Props {
 // Helper function to calculate polygon area in square meters
 function calculatePolygonArea(coordinates: [number, number][]): string {
     if (!coordinates || coordinates.length < 3) return '-';
-    
+
     // Shoelace formula
     let area = 0;
     const n = coordinates.length;
-    
+
     for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
         area += coordinates[i][0] * coordinates[j][1];
         area -= coordinates[j][0] * coordinates[i][1];
     }
-    
+
     area = Math.abs(area) / 2;
-    
+
     // Convert to meters (approximate)
     const metersPerDegreeLat = 111320;
     const metersPerDegreeLng = 111320 * 0.991;
-    
+
     const areaInSquareMeters = area * metersPerDegreeLat * metersPerDegreeLng;
-    
+
     if (areaInSquareMeters >= 10000) {
         const hectares = areaInSquareMeters / 10000;
         return `${hectares.toFixed(2)} ha`;
     }
-    
+
     return `${Math.round(areaInSquareMeters).toLocaleString('id-ID')} m²`;
 }
 
 // Helper function to calculate radius area in square meters
 function calculateRadiusArea(radiusData: any): string {
     if (!radiusData || !radiusData.radius) return '-';
-    
+
     const radius = radiusData.radius;
     const areaInSquareMeters = Math.PI * radius * radius;
-    
+
     if (areaInSquareMeters >= 10000) {
         const hectares = areaInSquareMeters / 10000;
         return `${hectares.toFixed(2)} ha`;
     }
-    
+
     return `${Math.round(areaInSquareMeters).toLocaleString('id-ID')} m²`;
 }
 
@@ -220,10 +243,6 @@ export default function CreateBencana({ bencana }: Props) {
         foto: null as File | null,
     });
 
-    useEffect(() => {
-        // Reset lokasi_data when tipe_lokasi changes
-        setData('lokasi_data', null);
-    }, [data.tipe_lokasi]);
 
 
 
@@ -351,7 +370,13 @@ export default function CreateBencana({ bencana }: Props) {
 
                             <div className="space-y-2">
                                 <Label htmlFor="tipe_lokasi">Tipe Penandaan</Label>
-                                <Select value={data.tipe_lokasi} onValueChange={(value) => setData('tipe_lokasi', value as 'titik' | 'polygon' | 'radius')}>
+                                <Select value={data.tipe_lokasi} onValueChange={(value) => {
+                                    setData(d => ({
+                                        ...d,
+                                        tipe_lokasi: value as 'titik' | 'polygon' | 'radius',
+                                        lokasi_data: null
+                                    }));
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -540,74 +565,99 @@ export default function CreateBencana({ bencana }: Props) {
                                 maxBoundsViscosity={1.0}
                                 minZoom={13}
                             >
-                                <BaseMapLayers />
+                                <LayersControl position="topright">
+                                    <LayersControl.BaseLayer checked name="OpenStreetMap">
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="Satellite (Esri)">
+                                        <TileLayer
+                                            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="Topographic (OpenTopoMap)">
+                                        <TileLayer
+                                            attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                                            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                                        />
+                                    </LayersControl.BaseLayer>
 
-                                {DESA_SOMAGEDE_BOUNDARY && (
-                                    <Polygon
-                                        positions={DESA_SOMAGEDE_BOUNDARY}
-                                        pathOptions={{
-                                            color: '#2563eb',
-                                            fillColor: '#3b82f6',
-                                            fillOpacity: 0.1,
-                                            weight: 2,
-                                            dashArray: '5, 5'
-                                        }}
+                                    {DESA_SOMAGEDE_BOUNDARY && (
+                                        <LayersControl.Overlay checked name="Batas Desa">
+                                            <Polygon
+                                                positions={DESA_SOMAGEDE_BOUNDARY}
+                                                pathOptions={{
+                                                    color: '#2563eb',
+                                                    fillColor: '#3b82f6',
+                                                    fillOpacity: 0.1,
+                                                    weight: 2,
+                                                    dashArray: '5, 5'
+                                                }}
+                                            />
+                                        </LayersControl.Overlay>
+                                    )}
+
+                                    <LayersControl.Overlay checked name="Penanda Bencana">
+                                        <LayerGroup>
+                                            {data.tipe_lokasi === 'polygon' && data.lokasi_data && (
+                                                <Polygon
+                                                    positions={data.lokasi_data as L.LatLngTuple[]}
+                                                    pathOptions={{
+                                                        color: data.warna_penanda,
+                                                        fillColor: data.warna_penanda,
+                                                        fillOpacity: 0.4,
+                                                        weight: 2,
+                                                    }}
+                                                />
+                                            )}
+
+                                            {data.tipe_lokasi === 'radius' && data.lokasi_data && (data.lokasi_data as any).radius && (data.lokasi_data as any).center && (
+                                                <Circle
+                                                    center={(data.lokasi_data as Radius).center}
+                                                    radius={(data.lokasi_data as Radius).radius}
+                                                    pathOptions={{
+                                                        color: data.warna_penanda,
+                                                        fillColor: data.warna_penanda,
+                                                        fillOpacity: 0.4,
+                                                    }}
+                                                />
+                                            )}
+
+                                            {data.tipe_lokasi === 'titik' && data.lokasi_data && (
+                                                <Marker
+                                                    position={data.lokasi_data as Point}
+                                                    icon={createDisasterIcon(data.jenis_bencana, data.tingkat_bahaya)}
+                                                />
+                                            )}
+                                        </LayerGroup>
+                                    </LayersControl.Overlay>
+                                </LayersControl>
+
+                                {data.tipe_lokasi === 'titik' && (
+                                    <PointMarker
+                                        onLocationSelect={handlePointSelect}
+                                        disasterType={data.jenis_bencana}
+                                        dangerLevel={data.tingkat_bahaya}
                                     />
                                 )}
 
-                                    {data.tipe_lokasi === 'polygon' && data.lokasi_data && (
-                                        <Polygon
-                                            positions={data.lokasi_data as L.LatLngTuple[]}
-                                            pathOptions={{
-                                                color: data.warna_penanda,
-                                                fillColor: data.warna_penanda,
-                                                fillOpacity: 0.4,
-                                                weight: 2,
-                                            }}
-                                        />
-                                    )}
+                                {data.tipe_lokasi === 'polygon' && (
+                                    <PolygonDrawer
+                                        onPolygonComplete={handlePolygonComplete}
+                                        color={data.warna_penanda}
+                                        opacity={0.4}
+                                    />
+                                )}
 
-                                    {data.tipe_lokasi === 'radius' && data.lokasi_data && (
-                                        <Circle
-                                            center={(data.lokasi_data as Radius).center}
-                                            radius={(data.lokasi_data as Radius).radius}
-                                            pathOptions={{
-                                                color: data.warna_penanda,
-                                                fillColor: data.warna_penanda,
-                                                fillOpacity: 0.4,
-                                            }}
-                                        />
-                                    )}
-
-                                    {data.tipe_lokasi === 'titik' && data.lokasi_data && (
-                                        <Marker
-                                            position={data.lokasi_data as Point}
-                                            icon={createDisasterIcon(data.jenis_bencana, data.tingkat_bahaya)}
-                                        />
-                                    )}
-
-                                    {data.tipe_lokasi === 'titik' && (
-                                        <PointMarker
-                                            onLocationSelect={handlePointSelect}
-                                            disasterType={data.jenis_bencana}
-                                            dangerLevel={data.tingkat_bahaya}
-                                        />
-                                    )}
-
-                                    {data.tipe_lokasi === 'polygon' && (
-                                        <PolygonDrawer
-                                            onPolygonComplete={handlePolygonComplete}
-                                            color={data.warna_penanda}
-                                            opacity={0.4}
-                                        />
-                                    )}
-
-                                    {data.tipe_lokasi === 'radius' && (
-                                        <RadiusCircle
-                                            onRadiusComplete={handleRadiusComplete}
-                                            color={data.warna_penanda}
-                                        />
-                                    )}
+                                {data.tipe_lokasi === 'radius' && (
+                                    <RadiusCircle
+                                        onRadiusComplete={handleRadiusComplete}
+                                        color={data.warna_penanda}
+                                    />
+                                )}
                                 <MapLegend
                                     title="Legenda Bencana"
                                     items={[{

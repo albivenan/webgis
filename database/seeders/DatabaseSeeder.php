@@ -16,9 +16,9 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         User::firstOrCreate(
-            ['email' => 'test@example.com'],
+            ['email' => 'tester@example.com'],
             [
-                'name' => 'Test User',
+                'name' => 'Tester',
                 'password' => bcrypt('password'), // Ganti dengan password yang aman
             ]
         );
@@ -26,13 +26,7 @@ class DatabaseSeeder extends Seeder
         // Seed GIS data
         $this->call([
             DesaSeeder::class,
-            LokasiPentingSeeder::class,
-            InfrastrukturSeeder::class,
-            PenggunaanLahanSeeder::class,
             KartuKeluargaSeeder::class,
-            FasilitasSeeder::class,
-            BatasWilayahSeeder::class,
-            BencanaSeeder::class,
             PersebaranPendudukSeeder::class,
             PendudukSeeder::class,
         ]);

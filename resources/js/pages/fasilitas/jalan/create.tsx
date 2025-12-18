@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import BaseMapLayers from '@/components/maps/BaseMapLayers';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { SharedData } from '@/types';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MapContainer, Polygon, Polyline } from 'react-leaflet';
+import { MapContainer, Polygon, Polyline, TileLayer, LayersControl, LayerGroup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DESA_SOMAGEDE_CENTER, DESA_SOMAGEDE_BOUNDARY } from '@/data/mockMapEvents';
@@ -251,7 +250,62 @@ const FasilitasJalanCreate: React.FC<FasilitasCreateProps> = ({ auth, desa, tipe
                                             maxBoundsViscosity={1.0}
                                             minZoom={13}
                                         >
-                                            <BaseMapLayers />
+                                            <LayersControl position="topright">
+                                                <LayersControl.BaseLayer checked name="OpenStreetMap">
+                                                    <TileLayer
+                                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                    />
+                                                </LayersControl.BaseLayer>
+                                                <LayersControl.BaseLayer name="Satellite (Esri)">
+                                                    <TileLayer
+                                                        attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                                    />
+                                                </LayersControl.BaseLayer>
+                                                <LayersControl.BaseLayer name="Topographic (OpenTopoMap)">
+                                                    <TileLayer
+                                                        attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                                                        url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                                                    />
+                                                </LayersControl.BaseLayer>
+
+                                                {DESA_SOMAGEDE_BOUNDARY && (
+                                                    <LayersControl.Overlay checked name="Batas Desa">
+                                                        <Polygon
+                                                            positions={DESA_SOMAGEDE_BOUNDARY}
+                                                            pathOptions={{
+                                                                color: '#2563eb',
+                                                                fillColor: 'transparent',
+                                                                weight: 3,
+                                                                dashArray: '5, 5'
+                                                            }}
+                                                        />
+                                                    </LayersControl.Overlay>
+                                                )}
+
+                                                <LayersControl.Overlay checked name="Jalur Jalan">
+                                                    <LayerGroup>
+                                                        {isRoadTypeSelected && (
+                                                            <PolylineDrawer
+                                                                onPolylineComplete={handlePolylineComplete}
+                                                                color={currentColor}
+                                                            />
+                                                        )}
+
+                                                        {polylineCoords && (
+                                                            <Polyline
+                                                                positions={polylineCoords}
+                                                                pathOptions={{
+                                                                    color: currentColor,
+                                                                    weight: 5,
+                                                                    opacity: 0.8
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </LayerGroup>
+                                                </LayersControl.Overlay>
+                                            </LayersControl>
                                             <MapLegend
                                                 title="Legenda"
                                                 items={data.jenis ? [
@@ -262,36 +316,6 @@ const FasilitasJalanCreate: React.FC<FasilitasCreateProps> = ({ auth, desa, tipe
                                                     }
                                                 ] : []}
                                             />
-                                            {DESA_SOMAGEDE_BOUNDARY && (
-                                                <Polygon
-                                                    positions={DESA_SOMAGEDE_BOUNDARY}
-                                                    pathOptions={{
-                                                        color: '#94a3b8',
-                                                        fillColor: '#cbd5e1',
-                                                        fillOpacity: 0.1,
-                                                        weight: 1,
-                                                        dashArray: '5, 5'
-                                                    }}
-                                                />
-                                            )}
-
-                                            {isRoadTypeSelected && (
-                                                <PolylineDrawer
-                                                    onPolylineComplete={handlePolylineComplete}
-                                                    color={currentColor}
-                                                />
-                                            )}
-
-                                            {polylineCoords && (
-                                                <Polyline
-                                                    positions={polylineCoords}
-                                                    pathOptions={{
-                                                        color: currentColor,
-                                                        weight: 5,
-                                                        opacity: 0.8
-                                                    }}
-                                                />
-                                            )}
                                         </MapContainer>
                                     </div>
                                     <InputError message={errors.koordinat} className="mt-2" />

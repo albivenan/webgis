@@ -161,7 +161,7 @@ export default function PolylineDrawer({ onPolylineComplete, color, existingPoly
         >
             <div className="leaflet-control leaflet-bar bg-white p-2 rounded shadow-lg">
                 {!isDrawing ? (
-                    <Button onClick={startDrawing} size="sm">
+                    <Button type="button" onClick={startDrawing} size="sm">
                         Gambar Garis Jalan
                     </Button>
                 ) : (
@@ -171,6 +171,7 @@ export default function PolylineDrawer({ onPolylineComplete, color, existingPoly
                         </div>
                         <div className="flex gap-2">
                             <Button
+                                type="button"
                                 onClick={finishDrawing}
                                 size="sm"
                                 disabled={points.length < 2}
@@ -179,6 +180,7 @@ export default function PolylineDrawer({ onPolylineComplete, color, existingPoly
                                 Selesai
                             </Button>
                             <Button
+                                type="button"
                                 onClick={cancelDrawing}
                                 size="sm"
                                 variant="outline"

@@ -1,8 +1,7 @@
 import MapLegend from '@/components/maps/MapLegend';
-import BaseMapLayers from '@/components/maps/BaseMapLayers';
 import AppLayout from '@/layouts/app-layout';
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polygon, Circle, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polygon, Circle, Popup, useMap, LayersControl, LayerGroup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { DESA_SOMAGEDE_CENTER, DESA_SOMAGEDE_BOUNDARY } from '@/data/mockMapEvents';
@@ -132,143 +131,168 @@ export default function BencanaBerlangsung({ bencana }: { bencana: Bencana[] }) 
                                 maxBoundsViscosity={1.0}
                                 minZoom={13}
                             >
-                                <BaseMapLayers />
+                                <LayersControl position="topright">
+                                    <LayersControl.BaseLayer checked name="OpenStreetMap">
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="Satellite (Esri)">
+                                        <TileLayer
+                                            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                        />
+                                    </LayersControl.BaseLayer>
+                                    <LayersControl.BaseLayer name="Topographic (OpenTopoMap)">
+                                        <TileLayer
+                                            attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                                            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                                        />
+                                    </LayersControl.BaseLayer>
 
-                                {DESA_SOMAGEDE_BOUNDARY && (
-                                    <Polygon
-                                        positions={DESA_SOMAGEDE_BOUNDARY}
-                                        pathOptions={{
-                                            color: '#2563eb',
-                                            fillColor: '#3b82f6',
-                                            fillOpacity: 0.1,
-                                            weight: 2,
-                                            dashArray: '5, 5'
-                                        }}
-                                    />
-                                )}
+                                    {DESA_SOMAGEDE_BOUNDARY && (
+                                        <LayersControl.Overlay checked name="Batas Desa">
+                                            <Polygon
+                                                positions={DESA_SOMAGEDE_BOUNDARY}
+                                                pathOptions={{
+                                                    color: '#2563eb',
+                                                    fillColor: '#3b82f6',
+                                                    fillOpacity: 0.1,
+                                                    weight: 2,
+                                                    dashArray: '5, 5'
+                                                }}
+                                            />
+                                        </LayersControl.Overlay>
+                                    )}
 
-                                {filteredBencana.map((b) => {
-                                    const color = tingkatBahayaMapColors[b.tingkat_bahaya] || '#71717a'; // default to gray
-                                    const isPoint = b.tipe_lokasi === 'titik' || b.tipe_lokasi === 'point';
+                                    <LayersControl.Overlay checked name="Data Bencana">
+                                        <LayerGroup>
+                                            {filteredBencana.map((b) => {
+                                                const color = tingkatBahayaMapColors[b.tingkat_bahaya] || '#71717a'; // default to gray
+                                                const isPoint = b.tipe_lokasi === 'titik' || b.tipe_lokasi === 'point';
 
-                                    if (isPoint && b.lokasi_data && b.lokasi_data.lat && b.lokasi_data.lng) {
-                                        return (
-                                            <Marker
-                                                key={b.id}
-                                                position={[b.lokasi_data.lat, b.lokasi_data.lng]}
-                                                icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
-                                            >
-                                                <Popup>
-                                                    <div className="p-2">
-                                                        <h3 className="font-bold">{b.nama_bencana}</h3>
-                                                        <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                        <div className="mt-1">
-                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
-                                                                {b.tingkat_bahaya.replace(/_/g, ' ')}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
-                                                        </p>
-                                                    </div>
-                                                </Popup>
-                                            </Marker>
-                                        );
-                                    } else if (b.tipe_lokasi === 'polygon' && Array.isArray(b.lokasi_data)) {
-                                        const polygonPositions = b.lokasi_data.map((coord: any) => Array.isArray(coord) ? coord : [coord.lat, coord.lng]);
-                                        // Ensure we have valid positions for getCenter
-                                        if (polygonPositions.length === 0) return null;
+                                                if (isPoint && b.lokasi_data && b.lokasi_data.lat && b.lokasi_data.lng) {
+                                                    return (
+                                                        <Marker
+                                                            key={b.id}
+                                                            position={[b.lokasi_data.lat, b.lokasi_data.lng]}
+                                                            icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
+                                                        >
+                                                            <Popup>
+                                                                <div className="p-2">
+                                                                    <h3 className="font-bold">{b.nama_bencana}</h3>
+                                                                    <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                                    <div className="mt-1">
+                                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
+                                                                            {b.tingkat_bahaya.replace(/_/g, ' ')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
+                                                                    </p>
+                                                                </div>
+                                                            </Popup>
+                                                        </Marker>
+                                                    );
+                                                } else if (b.tipe_lokasi === 'polygon' && Array.isArray(b.lokasi_data)) {
+                                                    const polygonPositions = b.lokasi_data.map((coord: any) => Array.isArray(coord) ? coord : [coord.lat, coord.lng]);
+                                                    // Ensure we have valid positions for getCenter
+                                                    if (polygonPositions.length === 0) return null;
 
-                                        // Explicitly cast to LatLngExpression[] for Leaflet
-                                        const leafletPositions = polygonPositions as L.LatLngExpression[];
-                                        const polygonCenter = L.latLngBounds(leafletPositions).getCenter();
+                                                    // Explicitly cast to LatLngExpression[] for Leaflet
+                                                    const leafletPositions = polygonPositions as L.LatLngExpression[];
+                                                    const polygonCenter = L.latLngBounds(leafletPositions).getCenter();
 
-                                        return (
-                                            <div key={b.id}>
-                                                <Polygon
-                                                    positions={leafletPositions}
-                                                    pathOptions={{
-                                                        color: color,
-                                                        fillColor: color,
-                                                        fillOpacity: 0.4,
-                                                        weight: 2,
-                                                    }}
-                                                >
-                                                    <Popup>
-                                                        <div className="p-2">
-                                                            <h3 className="font-bold">{b.nama_bencana}</h3>
-                                                            <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
-                                                            </p>
+                                                    return (
+                                                        <div key={b.id}>
+                                                            <Polygon
+                                                                positions={leafletPositions}
+                                                                pathOptions={{
+                                                                    color: color,
+                                                                    fillColor: color,
+                                                                    fillOpacity: 0.4,
+                                                                    weight: 2,
+                                                                }}
+                                                            >
+                                                                <Popup>
+                                                                    <div className="p-2">
+                                                                        <h3 className="font-bold">{b.nama_bencana}</h3>
+                                                                        <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
+                                                                        </p>
+                                                                    </div>
+                                                                </Popup>
+                                                            </Polygon>
+                                                            <Marker
+                                                                position={polygonCenter}
+                                                                icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
+                                                            >
+                                                                <Popup>
+                                                                    <div className="p-2">
+                                                                        <h3 className="font-bold">{b.nama_bencana}</h3>
+                                                                        <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                                        <div className="mt-1">
+                                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
+                                                                                {b.tingkat_bahaya.replace(/_/g, ' ')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </Popup>
+                                                            </Marker>
                                                         </div>
-                                                    </Popup>
-                                                </Polygon>
-                                                <Marker
-                                                    position={polygonCenter}
-                                                    icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
-                                                >
-                                                    <Popup>
-                                                        <div className="p-2">
-                                                            <h3 className="font-bold">{b.nama_bencana}</h3>
-                                                            <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                            <div className="mt-1">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
-                                                                    {b.tingkat_bahaya.replace(/_/g, ' ')}
-                                                                </span>
-                                                            </div>
+                                                    );
+                                                } else if (b.tipe_lokasi === 'radius' && b.lokasi_data.center && b.lokasi_data.radius) {
+                                                    return (
+                                                        <div key={b.id}>
+                                                            <Circle
+                                                                center={[b.lokasi_data.center.lat, b.lokasi_data.center.lng]}
+                                                                radius={b.lokasi_data.radius}
+                                                                pathOptions={{
+                                                                    color: color,
+                                                                    fillColor: color,
+                                                                    fillOpacity: 0.4,
+                                                                    weight: 2,
+                                                                }}
+                                                            >
+                                                                <Popup>
+                                                                    <div className="p-2">
+                                                                        <h3 className="font-bold">{b.nama_bencana}</h3>
+                                                                        <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            Radius: {b.lokasi_data.radius}m
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
+                                                                        </p>
+                                                                    </div>
+                                                                </Popup>
+                                                            </Circle>
+                                                            <Marker
+                                                                position={[b.lokasi_data.center.lat, b.lokasi_data.center.lng]}
+                                                                icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
+                                                            >
+                                                                <Popup>
+                                                                    <div className="p-2">
+                                                                        <h3 className="font-bold">{b.nama_bencana}</h3>
+                                                                        <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
+                                                                        <div className="mt-1">
+                                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
+                                                                                {b.tingkat_bahaya.replace(/_/g, ' ')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </Popup>
+                                                            </Marker>
                                                         </div>
-                                                    </Popup>
-                                                </Marker>
-                                            </div>
-                                        );
-                                    } else if (b.tipe_lokasi === 'radius' && b.lokasi_data.center && b.lokasi_data.radius) {
-                                        return (
-                                            <div key={b.id}>
-                                                <Circle
-                                                    center={[b.lokasi_data.center.lat, b.lokasi_data.center.lng]}
-                                                    radius={b.lokasi_data.radius}
-                                                    pathOptions={{
-                                                        color: color,
-                                                        fillColor: color,
-                                                        fillOpacity: 0.4,
-                                                        weight: 2,
-                                                    }}
-                                                >
-                                                    <Popup>
-                                                        <div className="p-2">
-                                                            <h3 className="font-bold">{b.nama_bencana}</h3>
-                                                            <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                Radius: {b.lokasi_data.radius}m
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {new Date(b.tanggal_mulai).toLocaleDateString('id-ID')}
-                                                            </p>
-                                                        </div>
-                                                    </Popup>
-                                                </Circle>
-                                                <Marker
-                                                    position={[b.lokasi_data.center.lat, b.lokasi_data.center.lng]}
-                                                    icon={createDisasterIcon(b.jenis_bencana, b.tingkat_bahaya)}
-                                                >
-                                                    <Popup>
-                                                        <div className="p-2">
-                                                            <h3 className="font-bold">{b.nama_bencana}</h3>
-                                                            <p className="text-sm">{b.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                            <div className="mt-1">
-                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${tingkatBahayaColors[b.tingkat_bahaya as keyof typeof tingkatBahayaColors]}`}>
-                                                                    {b.tingkat_bahaya.replace(/_/g, ' ')}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </Popup>
-                                                </Marker>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                })}
+                                                    );
+                                                }
+                                                return null;
+                                            })}
+                                        </LayerGroup>
+                                    </LayersControl.Overlay>
+                                </LayersControl>
                                 <MapLegend
                                     title="Legenda Bencana"
                                     items={[

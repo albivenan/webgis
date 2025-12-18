@@ -10,6 +10,7 @@ import MarkerPopupContent from '@/components/maps/MarkerPopupContent';
 import { Button } from '../ui/button';
 import { Link } from '@inertiajs/react';
 import { LAND_USE_COLORS, landUseTypes, tingkatBahayaMapColors } from '@/lib/map-constants';
+import { getRoadColor } from '@/lib/road-utils';
 
 interface LegendItem {
     label: string;
@@ -51,10 +52,12 @@ interface MapViewProps {
     batasWilayah?: BatasWilayahItem[]; // Batas Wilayah
     villageBoundary?: [number, number][]; // Village boundary
     activeLayers?: string[];
+    onElementClick?: (element: any) => void;
+    flyToLocation?: [number, number];
 }
 
 // Component to fit map bounds to the village boundary
-function FitBounds({ boundary }: { boundary: [number, number][] }) {
+function MapEvents({ boundary, flyToLocation }: { boundary?: [number, number][], flyToLocation?: [number, number] }) {
     const map = useMap();
 
     useEffect(() => {
@@ -63,6 +66,15 @@ function FitBounds({ boundary }: { boundary: [number, number][] }) {
             map.fitBounds(bounds);
         }
     }, [boundary, map]);
+
+    useEffect(() => {
+        if (flyToLocation) {
+            map.flyTo(flyToLocation, 18, {
+                animate: true,
+                duration: 1.5
+            });
+        }
+    }, [flyToLocation, map]);
 
     return null;
 }
@@ -85,7 +97,9 @@ export default function MapView({
     rumah = [],
     batasWilayah = [],
     villageBoundary,
-    activeLayers = []
+    activeLayers = [],
+    onElementClick,
+    flyToLocation
 }: MapViewProps) {
 
     // Helper to parse GeoJSON if it's a string
@@ -120,21 +134,24 @@ export default function MapView({
     const getLegendItems = (): LegendItem[] => {
         const items: LegendItem[] = [];
 
+        const formatLabel = (str: string) => {
+            return str.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+        };
+
         if (activeLayers.includes('lokasi-penduduk') && rumah.length > 0) {
             items.push({
                 label: 'Lokasi Penduduk',
-                color: '#3b82f6', // Default marker color
+                color: '#3b82f6',
                 iconHtml: getFacilityIconSVG('rumah', '#3b82f6')
             });
         }
 
         if (activeLayers.includes('fasilitas-umum') && fasilitasUmum.length > 0) {
-            // Assuming fasilitasUmum items have a 'jenis' property that maps to an icon type
             const uniqueJenis = [...new Set(fasilitasUmum.map(f => f.jenis))];
             uniqueJenis.forEach(jenis => {
                 items.push({
-                    label: `Fasilitas Umum (${jenis})`,
-                    color: '#3b82f6', // Default color, actual icon color comes from getFacilityIconSVG
+                    label: formatLabel(jenis),
+                    color: '#3b82f6',
                     iconHtml: getFacilityIconSVG(jenis, '#3b82f6')
                 });
             });
@@ -144,87 +161,77 @@ export default function MapView({
             const uniqueJenis = [...new Set(fasilitasPrivat.map(f => f.jenis))];
             uniqueJenis.forEach(jenis => {
                 items.push({
-                    label: `Fasilitas Privat (${jenis})`,
-                    color: '#3b82f6', // Default color, actual icon color comes from getFacilityIconSVG
+                    label: formatLabel(jenis),
+                    color: '#3b82f6',
                     iconHtml: getFacilityIconSVG(jenis, '#3b82f6')
                 });
             });
         }
 
         if (activeLayers.includes('fasilitas-jalan') && fasilitasJalan.length > 0) {
-            // Check for both point and polyline types
-            const hasPolyline = fasilitasJalan.some(item => Array.isArray(item.koordinat) && item.koordinat.length > 2 && Array.isArray(item.koordinat[0]));
-            const hasPoint = fasilitasJalan.some(item => Array.isArray(item.koordinat) && item.koordinat.length === 2);
+            const roadTypes = [
+                { id: 'jalan_nasional', label: 'Jalan Nasional' },
+                { id: 'jalan_provinsi', label: 'Jalan Provinsi' },
+                { id: 'jalan_kabupaten', label: 'Jalan Kabupaten' },
+                { id: 'jalan_desa', label: 'Jalan Desa' },
+                { id: 'jalan_lingkungan', label: 'Jalan Lingkungan' },
+                { id: 'jalan_setapak', label: 'Jalan Setapak' },
+            ];
 
-            if (hasPolyline) {
-                items.push({
-                    label: 'Jalan (Garis)',
-                    color: '#333',
-                    type: 'line'
-                });
-            }
-            if (hasPoint) {
-                items.push({
-                    label: 'Jalan (Titik)',
-                    color: '#3b82f6', // Default marker color
-                    iconHtml: getFacilityIconSVG('default', '#3b82f6')
-                });
-            }
+            let headerAdded = false;
+            roadTypes.forEach(type => {
+                const hasThisType = fasilitasJalan.some(f => f.jenis === type.id);
+                if (hasThisType) {
+                    if (!headerAdded) {
+                        items.push({ label: 'Fasilitas Jalan', color: 'transparent', type: 'point' });
+                        headerAdded = true;
+                    }
+                    items.push({
+                        label: type.label,
+                        color: getRoadColor(type.id),
+                        type: 'line'
+                    });
+                }
+            });
         }
 
         if (activeLayers.includes('batas-wilayah') && batasWilayah.length > 0) {
-            items.push({ label: 'Batas Wilayah', color: 'transparent', type: 'point' });
-            landUseTypes.forEach(type => {
-                items.push({
-                    label: type,
-                    color: LAND_USE_COLORS[type] || '#000000',
-                    type: 'point',
+            const activeLandUseTypes = [...new Set(batasWilayah.map(bw => bw.jenis))];
+            if (activeLandUseTypes.length > 0) {
+                items.push({ label: 'Batas Wilayah', color: 'transparent', type: 'point' });
+                activeLandUseTypes.forEach(type => {
+                    items.push({
+                        label: type,
+                        color: LAND_USE_COLORS[type] || '#000000',
+                        type: 'point',
+                    });
                 });
-            });
+            }
         }
-
 
         if (activeLayers.includes('tragedi-berlangsung') && bencanaBerlangsung.length > 0) {
-            // Ambil jenis bencana sampel untuk ikon legenda
-            const sampleJenisBencana = bencanaBerlangsung[0]?.jenis_bencana || 'default';
-            items.push({
-                label: 'Tragedi Berlangsung',
-                color: 'transparent',
-                type: 'point',
-                iconHtml: createDisasterIcon(sampleJenisBencana, 'tinggi').options.html
-            });
-            const uniqueSeverities = [...new Set(bencanaBerlangsung.map(b => b.tingkat_bahaya))];
-            uniqueSeverities.forEach(tingkat_bahaya => {
+            items.push({ label: 'Tragedi Berlangsung', color: 'transparent', type: 'point' });
+            bencanaBerlangsung.forEach(item => {
                 items.push({
-                    label: tingkat_bahaya.replace(/_/g, ' '),
-                    color: tingkatBahayaMapColors[tingkat_bahaya] || '#71717a',
+                    label: item.nama_bencana,
+                    color: tingkatBahayaMapColors[item.tingkat_bahaya] || '#71717a',
                     type: 'point',
-                    iconHtml: createDisasterIcon(sampleJenisBencana, tingkat_bahaya).options.html
+                    iconHtml: createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya).options.html
                 });
             });
         }
-
 
         if (activeLayers.includes('riwayat-tragedi') && bencanaRiwayat.length > 0) {
-            // Ambil jenis bencana sampel untuk ikon legenda
-            const sampleJenisBencana = bencanaRiwayat[0]?.jenis_bencana || 'default';
-            items.push({
-                label: 'Riwayat Tragedi',
-                color: 'transparent',
-                type: 'point',
-                iconHtml: createDisasterIcon(sampleJenisBencana, 'tinggi').options.html
-            });
-            const uniqueSeverities = [...new Set(bencanaRiwayat.map(b => b.tingkat_bahaya))];
-            uniqueSeverities.forEach(tingkat_bahaya => {
+            items.push({ label: 'Riwayat Tragedi', color: 'transparent', type: 'point' });
+            bencanaRiwayat.forEach(item => {
                 items.push({
-                    label: tingkat_bahaya.replace(/_/g, ' '),
-                    color: tingkatBahayaMapColors[tingkat_bahaya] || '#71717a',
+                    label: item.nama_bencana,
+                    color: tingkatBahayaMapColors[item.tingkat_bahaya] || '#71717a',
                     type: 'point',
-                    iconHtml: createDisasterIcon(sampleJenisBencana, tingkat_bahaya).options.html
+                    iconHtml: createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya).options.html
                 });
             });
         }
-
 
         return items;
     };
@@ -264,7 +271,7 @@ export default function MapView({
 
 
                 {/* Fit map to village boundary if provided */}
-                {villageBoundary && <FitBounds boundary={villageBoundary} />}
+                <MapEvents boundary={villageBoundary} flyToLocation={flyToLocation} />
 
                 {/* Render MapLegend */}
                 {legendItems.length > 0 && <MapLegend items={legendItems} />}
@@ -290,20 +297,27 @@ export default function MapView({
                 <LayersControl.Overlay checked={activeLayers.includes('lokasi-penduduk')} name="Lokasi Penduduk">
                     <LayerGroup>
                         {rumah.map((item) => (
-                            <Marker key={`rumah-${item.id}`} position={[item.latitude, item.longitude]} icon={createFacilityIcon('rumah')}>
-                                <Tooltip>{item.alamat}</Tooltip>
-                                <Popup>
-                                    <MarkerPopupContent
-                                        name={item.alamat}
-                                        type="rumah"
-                                        id={item.id}
-                                        imageUrl={item.foto_rumah}
-                                        additionalInfo={[
+                            <Marker
+                                key={`rumah-${item.id}`}
+                                position={[item.latitude, item.longitude]}
+                                icon={createFacilityIcon('rumah')}
+                                eventHandlers={{
+                                    click: () => onElementClick?.({
+                                        id: item.id,
+                                        nama: item.nama_pemilik || item.alamat,
+                                        type: 'rumah',
+                                        details: [
                                             { label: 'RT/RW', value: `${item.rt}/${item.rw}` },
                                             ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
-                                        ]}
-                                    />
-                                </Popup>
+                                        ],
+                                        image: item.foto_rumah,
+                                        location: [item.latitude, item.longitude]
+                                    })
+                                }}
+                            >
+                                <Tooltip permanent direction="top" offset={[0, -10]} className="google-label">
+                                    {item.nama_pemilik || item.alamat}
+                                </Tooltip>
                             </Marker>
                         ))}
                     </LayerGroup>
@@ -318,21 +332,25 @@ export default function MapView({
                                     key={`fasilitas-umum-${item.id}`}
                                     position={[item.koordinat[1], item.koordinat[0]]}
                                     icon={createFacilityIcon(item.jenis)}
-                                >
-                                    <Tooltip>{item.nama}</Tooltip>
-                                    <Popup>
-                                        <MarkerPopupContent
-                                            name={item.nama}
-                                            type="fasilitas"
-                                            id={item.id}
-                                            imageUrl={item.foto}
-                                            additionalInfo={[
+                                    eventHandlers={{
+                                        click: () => onElementClick?.({
+                                            id: item.id,
+                                            nama: item.nama,
+                                            type: 'fasilitas',
+                                            category: item.jenis,
+                                            details: [
                                                 { label: 'Jenis', value: item.jenis },
                                                 { label: 'Kondisi', value: item.kondisi },
                                                 ...(item.alamat_manual ? [{ label: 'Alamat', value: item.alamat_manual }] : []),
-                                            ]}
-                                        />
-                                    </Popup>
+                                            ],
+                                            image: item.foto,
+                                            location: [item.koordinat[1], item.koordinat[0]]
+                                        })
+                                    }}
+                                >
+                                    <Tooltip permanent direction="top" offset={[0, -10]} className="google-label">
+                                        {item.nama}
+                                    </Tooltip>
                                 </Marker>
                             )
                         ))}
@@ -348,21 +366,25 @@ export default function MapView({
                                     key={`fasilitas-privat-${item.id}`}
                                     position={[item.koordinat[1], item.koordinat[0]]}
                                     icon={createFacilityIcon(item.jenis)}
-                                >
-                                    <Tooltip>{item.nama}</Tooltip>
-                                    <Popup>
-                                        <MarkerPopupContent
-                                            name={item.nama}
-                                            type="fasilitas"
-                                            id={item.id}
-                                            imageUrl={item.foto}
-                                            additionalInfo={[
+                                    eventHandlers={{
+                                        click: () => onElementClick?.({
+                                            id: item.id,
+                                            nama: item.nama,
+                                            type: 'fasilitas',
+                                            category: item.jenis,
+                                            details: [
                                                 { label: 'Jenis', value: item.jenis },
                                                 { label: 'Kondisi', value: item.kondisi },
                                                 ...(item.alamat_manual ? [{ label: 'Alamat', value: item.alamat_manual }] : []),
-                                            ]}
-                                        />
-                                    </Popup>
+                                            ],
+                                            image: item.foto,
+                                            location: [item.koordinat[1], item.koordinat[0]]
+                                        })
+                                    }}
+                                >
+                                    <Tooltip permanent direction="top" offset={[0, -10]} className="google-label">
+                                        {item.nama}
+                                    </Tooltip>
                                 </Marker>
                             )
                         ))}
@@ -373,40 +395,85 @@ export default function MapView({
                 <LayersControl.Overlay checked={activeLayers.includes('fasilitas-jalan')} name="Fasilitas Jalan">
                     <LayerGroup>
                         {fasilitasJalan.map((item) => {
-                            // Handle jalan as polyline if koordinat is an array of coordinates
-                            if (item.koordinat && Array.isArray(item.koordinat) && item.koordinat.length > 2) {
-                                // Check if it's a polyline (array of coordinate pairs)
-                                const isPolyline = Array.isArray(item.koordinat[0]) && item.koordinat[0].length === 2;
+                            let coords = item.koordinat;
+
+                            // Check for GeoJSON LineString
+                            if (coords && coords.type === 'LineString' && Array.isArray(coords.coordinates)) {
+                                const positions = coords.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+                                return (
+                                    <Polyline
+                                        key={`fasilitas-jalan-${item.id}`}
+                                        positions={positions}
+                                        pathOptions={{ color: getRoadColor(item.jenis), weight: 4 }}
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama,
+                                                type: 'fasilitas',
+                                                category: item.jenis,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis.replace(/_/g, ' ') },
+                                                    { label: 'Kondisi', value: item.kondisi.replace(/_/g, ' ') }
+                                                ],
+                                                location: positions[Math.floor(positions.length / 2)]
+                                            })
+                                        }}
+                                    >
+                                        <Tooltip permanent direction="center" className="google-label">
+                                            {item.nama}
+                                        </Tooltip>
+                                    </Polyline>
+                                );
+                            }
+
+                            // Handle jalan as manual array of coordinates if they are more than 2 (old format/helper)
+                            if (Array.isArray(coords) && coords.length > 2) {
+                                const isPolyline = Array.isArray(coords[0]) && coords[0].length === 2;
                                 if (isPolyline) {
-                                    const positions = item.koordinat.map((coord: number[]) => [coord[1], coord[0]]);
+                                    const positions = coords.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
                                     return (
                                         <Polyline
                                             key={`fasilitas-jalan-${item.id}`}
                                             positions={positions}
-                                            pathOptions={{ color: '#333', weight: 3 }}
+                                            pathOptions={{ color: getRoadColor(item.jenis), weight: 4 }}
                                         >
+                                            <Tooltip permanent direction="center" className="google-label">
+                                                {item.nama}
+                                            </Tooltip>
                                             <Popup>
                                                 <div className="font-bold">{item.nama}</div>
-                                                <div>Jenis: {item.jenis}</div>
-                                                <div>Kondisi: {item.kondisi}</div>
+                                                <div>Jenis: {item.jenis.replace(/_/g, ' ')}</div>
+                                                <div>Kondisi: {item.kondisi.replace(/_/g, ' ')}</div>
                                             </Popup>
                                         </Polyline>
                                     );
                                 }
                             }
-                            // Handle as marker if single coordinate
-                            if (item.koordinat && item.koordinat.length === 2) {
+
+                            // Handle as marker if single coordinate (point format)
+                            if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number') {
                                 return (
                                     <Marker
                                         key={`fasilitas-jalan-${item.id}`}
-                                        position={[item.koordinat[1], item.koordinat[0]]}
+                                        position={[coords[1], coords[0]]}
                                         icon={createFacilityIcon(item.jenis)}
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama,
+                                                type: 'fasilitas',
+                                                category: item.jenis,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis.replace(/_/g, ' ') },
+                                                    { label: 'Kondisi', value: item.kondisi.replace(/_/g, ' ') }
+                                                ],
+                                                location: [coords[1], coords[0]]
+                                            })
+                                        }}
                                     >
-                                        <Popup>
-                                            <div className="font-bold">{item.nama}</div>
-                                            <div>Jenis: {item.jenis}</div>
-                                            <div>Kondisi: {item.kondisi}</div>
-                                        </Popup>
+                                        <Tooltip permanent direction="top" offset={[0, -10]} className="google-label">
+                                            {item.nama}
+                                        </Tooltip>
                                     </Marker>
                                 );
                             }
@@ -433,24 +500,43 @@ export default function MapView({
                                             fillOpacity: 0.5,
                                             weight: 2
                                         }}
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama,
+                                                type: 'batas-wilayah',
+                                                category: item.jenis,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis },
+                                                    { label: 'Pemilik', value: item.nama_pemilik },
+                                                    { label: 'Luas', value: item.luas ? `${(item.luas / 10000).toFixed(2)} ha` : '-' }
+                                                ],
+                                                location: polygonCenter
+                                            })
+                                        }}
                                     >
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis}</p>
-                                                    {item.nama_pemilik && <p><span className="font-semibold">Pemilik:</span> {item.nama_pemilik}</p>}
-                                                    {item.luas && <p><span className="font-semibold">Luas:</span> {(item.luas / 10000).toFixed(2)} ha</p>}
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('batas-wilayah.index')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
-                                        <Tooltip>{item.nama}</Tooltip>
+                                        <Tooltip permanent direction="center" className="google-label !text-blue-800">
+                                            {item.nama}
+                                        </Tooltip>
                                     </Polygon>
-                                    <Marker position={polygonCenter} icon={createFacilityIcon(item.jenis)} />
+                                    <Marker
+                                        position={polygonCenter}
+                                        icon={createFacilityIcon(item.jenis)}
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama,
+                                                type: 'batas-wilayah',
+                                                category: item.jenis,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis },
+                                                    { label: 'Pemilik', value: item.nama_pemilik },
+                                                    { label: 'Luas', value: item.luas ? `${(item.luas / 10000).toFixed(2)} ha` : '-' }
+                                                ],
+                                                location: [polygonCenter.lat, polygonCenter.lng]
+                                            })
+                                        }}
+                                    />
                                 </React.Fragment>
                             );
                         })}
@@ -475,25 +561,24 @@ export default function MapView({
                                         key={`bencana-riwayat-marker-${item.id}`}
                                         position={[lat, lng]}
                                         icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama_bencana,
+                                                type: 'bencana',
+                                                category: item.jenis_bencana,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis_bencana.replace(/_/g, ' ') },
+                                                    { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                    { label: 'Tanggal Mulai', value: new Date(item.tanggal_mulai).toLocaleDateString('id-ID') },
+                                                ],
+                                                location: [lat, lng]
+                                            })
+                                        }}
                                     >
-                                        <Tooltip>{item.nama_bencana}</Tooltip>
-                                        <Popup>
-                                            <div className="p-2 min-w-[220px]">
-                                                <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                <div className="text-xs space-y-1 mb-3">
-                                                    <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                    <p><span className="font-semibold">Tanggal Mulai:</span> {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')}</p>
-                                                    {item.tanggal_selesai && (
-                                                        <p><span className="font-semibold">Tanggal Selesai:</span> {new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}</p>
-                                                    )}
-                                                    <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                    {item.keterangan && <p><span className="font-semibold">Keterangan:</span> {item.keterangan}</p>}
-                                                </div>
-                                                <Link href={route('bencana.riwayat')}>
-                                                    <Button size="sm" className="w-full">Detail</Button>
-                                                </Link>
-                                            </div>
-                                        </Popup>
+                                        <Tooltip permanent direction="top" offset={[0, -15]} className="google-label !text-red-700">
+                                            {item.nama_bencana}
+                                        </Tooltip>
                                     </Marker>
                                 );
                             }
@@ -515,35 +600,43 @@ export default function MapView({
                                                 fillOpacity: 0.15,
                                                 weight: 2
                                             }}
-                                        >
-                                            <Popup>
-                                                <div className="p-2 min-w-[220px]">
-                                                    <h3 className="font-bold text-sm mb-2">{item.nama_bencana}</h3>
-                                                    <div className="text-xs space-y-1 mb-3">
-                                                        <p><span className="font-semibold">Jenis:</span> {item.jenis_bencana.replace(/_/g, ' ')}</p>
-                                                        <p><span className="font-semibold">Tingkat Bahaya:</span> {item.tingkat_bahaya.replace(/_/g, ' ')}</p>
-                                                        <p><span className="font-semibold">Radius:</span> {parsedLokasiData.radius}m</p>
-                                                    </div>
-                                                </div>
-                                            </Popup>
-                                        </Circle>
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
+                                                        { label: 'Jenis', value: item.jenis_bencana.replace(/_/g, ' ') },
+                                                        { label: 'Status', value: item.status },
+                                                        { label: 'Radius', value: `${parsedLokasiData.radius}m` },
+                                                    ],
+                                                    location: [centerLat, centerLng]
+                                                })
+                                            }}
+                                        />
                                         <Marker
                                             key={`bencana-riwayat-radius-marker-${item.id}`}
                                             position={[centerLat, centerLng]}
                                             icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
-                                        >
-                                            <Popup>
-                                                <MarkerPopupContent
-                                                    name={item.nama_bencana}
-                                                    type="bencana"
-                                                    id={item.id}
-                                                    additionalInfo={[
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
                                                         { label: 'Jenis', value: item.jenis_bencana.replace(/_/g, ' ') },
-                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                                        { label: 'Status', value: item.status },
                                                         { label: 'Radius', value: `${parsedLokasiData.radius}m` },
-                                                    ]}
-                                                />
-                                            </Popup>
+                                                    ],
+                                                    location: [centerLat, centerLng]
+                                                })
+                                            }}
+                                        >
+                                            <Tooltip permanent direction="top" offset={[0, -15]} className="google-label !text-red-700">
+                                                {item.nama_bencana}
+                                            </Tooltip>
                                         </Marker>
                                     </React.Fragment>
                                 );
@@ -562,38 +655,42 @@ export default function MapView({
                                             key={`bencana-riwayat-polygon-${item.id}`}
                                             positions={leafletPositions}
                                             pathOptions={{ color: color, fillColor: color, fillOpacity: 0.4, weight: 2 }}
-                                        >
-                                            <Popup>
-                                                <MarkerPopupContent
-                                                    name={item.nama_bencana}
-                                                    type="bencana"
-                                                    id={item.id}
-                                                    imageUrl={item.foto}
-                                                    additionalInfo={[
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
                                                         { label: 'Jenis', value: item.jenis_bencana },
-                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya },
                                                         { label: 'Status', value: item.status },
-                                                    ]}
-                                                />
-                                            </Popup>
+                                                    ],
+                                                    location: polygonCenter
+                                                })
+                                            }}
+                                        >
                                         </Polygon>
                                         <Marker
                                             key={`bencana-riwayat-polygon-marker-${item.id}`}
                                             position={polygonCenter}
                                             icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
-                                        >
-                                            <Popup>
-                                                <MarkerPopupContent
-                                                    name={item.nama_bencana}
-                                                    type="bencana"
-                                                    id={item.id}
-                                                    imageUrl={item.foto}
-                                                    additionalInfo={[
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
                                                         { label: 'Jenis', value: item.jenis_bencana },
-                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya },
-                                                    ]}
-                                                />
-                                            </Popup>
+                                                        { label: 'Status', value: item.status },
+                                                    ],
+                                                    location: polygonCenter
+                                                })
+                                            }}
+                                        >
+                                            <Tooltip permanent direction="top" offset={[0, -15]} className="google-label !text-red-700">
+                                                {item.nama_bencana}
+                                            </Tooltip>
                                         </Marker>
                                     </React.Fragment>
                                 );
@@ -614,23 +711,25 @@ export default function MapView({
                                         key={`berlangsung-tragedi-marker-${item.id}`}
                                         position={[item.lokasi_data.lat, item.lokasi_data.lng]}
                                         icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
-                                    >
-                                        <Tooltip>{item.nama_bencana}</Tooltip>
-                                        <Popup>
-                                            <MarkerPopupContent
-                                                name={item.nama_bencana}
-                                                type="bencana"
-                                                id={item.id}
-                                                imageUrl={item.foto_bencana}
-                                                additionalInfo={[
-                                                    { label: 'Jenis Bencana', value: item.jenis_bencana },
+                                        eventHandlers={{
+                                            click: () => onElementClick?.({
+                                                id: item.id,
+                                                nama: item.nama_bencana,
+                                                type: 'bencana',
+                                                category: item.jenis_bencana,
+                                                details: [
+                                                    { label: 'Jenis', value: item.jenis_bencana },
                                                     { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
                                                     { label: 'Status', value: item.status },
-                                                    { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
-                                                    ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
-                                                ]}
-                                            />
-                                        </Popup>
+                                                ],
+                                                image: item.foto_bencana,
+                                                location: [item.lokasi_data.lat, item.lokasi_data.lng]
+                                            })
+                                        }}
+                                    >
+                                        <Tooltip permanent direction="top" offset={[0, -15]} className="google-label !text-red-700">
+                                            {item.nama_bencana}
+                                        </Tooltip>
                                     </Marker>
                                 );
                             } else if (item.tipe_lokasi === 'polygon' && Array.isArray(item.lokasi_data)) {
@@ -647,25 +746,41 @@ export default function MapView({
                                                 fillOpacity: 0.5,
                                                 weight: 2
                                             }}
-                                        >
-                                            <Tooltip>{item.nama_bencana}</Tooltip>
-                                            <Popup>
-                                                <MarkerPopupContent
-                                                    name={item.nama_bencana}
-                                                    type="bencana"
-                                                    id={item.id}
-                                                    imageUrl={item.foto_bencana}
-                                                    additionalInfo={[
-                                                        { label: 'Jenis Bencana', value: item.jenis_bencana },
-                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
+                                                        { label: 'Jenis', value: item.jenis_bencana },
                                                         { label: 'Status', value: item.status },
-                                                        { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
-                                                        ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
-                                                    ]}
-                                                />
-                                            </Popup>
+                                                    ],
+                                                    image: item.foto_bencana,
+                                                    location: polygonCenter
+                                                })
+                                            }}
+                                        >
+                                            <Tooltip permanent direction="center" className="google-label !text-red-700">{item.nama_bencana}</Tooltip>
                                         </Polygon>
-                                        <Marker position={polygonCenter} icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)} />
+                                        <Marker
+                                            position={polygonCenter}
+                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
+                                                        { label: 'Jenis', value: item.jenis_bencana },
+                                                        { label: 'Status', value: item.status },
+                                                    ],
+                                                    image: item.foto_bencana,
+                                                    location: polygonCenter
+                                                })
+                                            }}
+                                        />
                                     </React.Fragment>
                                 );
                             } else if (item.tipe_lokasi === 'radius' && item.lokasi_data && item.lokasi_data.center && item.lokasi_data.radius) {
@@ -680,26 +795,43 @@ export default function MapView({
                                                 fillOpacity: 0.4,
                                                 weight: 2,
                                             }}
-                                        >
-                                            <Tooltip>{item.nama_bencana}</Tooltip>
-                                            <Popup>
-                                                <MarkerPopupContent
-                                                    name={item.nama_bencana}
-                                                    type="bencana"
-                                                    id={item.id}
-                                                    imageUrl={item.foto_bencana}
-                                                    additionalInfo={[
-                                                        { label: 'Jenis Bencana', value: item.jenis_bencana },
-                                                        { label: 'Tingkat Bahaya', value: item.tingkat_bahaya.replace(/_/g, ' ') },
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
+                                                        { label: 'Jenis', value: item.jenis_bencana },
                                                         { label: 'Status', value: item.status },
-                                                        { label: 'Tanggal', value: new Date(item.tanggal_kejadian).toLocaleDateString() },
-                                                        ...(item.keterangan ? [{ label: 'Keterangan', value: item.keterangan }] : []),
                                                         { label: 'Radius', value: `${item.lokasi_data.radius}m` },
-                                                    ]}
-                                                />
-                                            </Popup>
+                                                    ],
+                                                    image: item.foto_bencana,
+                                                    location: [item.lokasi_data.center.lat, item.lokasi_data.center.lng]
+                                                })
+                                            }}
+                                        >
+                                            <Tooltip permanent direction="center" className="google-label !text-red-700">{item.nama_bencana}</Tooltip>
                                         </Circle>
-                                        <Marker position={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]} icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)} />
+                                        <Marker
+                                            position={[item.lokasi_data.center.lat, item.lokasi_data.center.lng]}
+                                            icon={createDisasterIcon(item.jenis_bencana, item.tingkat_bahaya)}
+                                            eventHandlers={{
+                                                click: () => onElementClick?.({
+                                                    id: item.id,
+                                                    nama: item.nama_bencana,
+                                                    type: 'bencana',
+                                                    category: item.jenis_bencana,
+                                                    details: [
+                                                        { label: 'Jenis', value: item.jenis_bencana },
+                                                        { label: 'Status', value: item.status },
+                                                        { label: 'Radius', value: `${item.lokasi_data.radius}m` },
+                                                    ],
+                                                    image: item.foto_bencana,
+                                                    location: [item.lokasi_data.center.lat, item.lokasi_data.center.lng]
+                                                })
+                                            }}
+                                        />
                                     </React.Fragment>
                                 );
                             }
@@ -708,6 +840,28 @@ export default function MapView({
                     </LayerGroup>
                 </LayersControl.Overlay>
             </LayersControl>
-        </MapContainer>
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                .google-label {
+                    background: transparent !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #334155 !important; /* slate-700 */
+                    padding: 0 !important;
+                    white-space: nowrap;
+                    pointer-events: none;
+                }
+                .leaflet-tooltip-top:before,
+                .leaflet-tooltip-bottom:before,
+                .leaflet-tooltip-left:before,
+                .leaflet-tooltip-right:before {
+                    display: none !important;
+                }
+                `
+            }} />
+        </MapContainer >
     );
 }

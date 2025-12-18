@@ -31,7 +31,29 @@ class MarkerDataController extends Controller
 
     public function getRumahMarkers()
     {
-        $rumah = Rumah::all();
+        $rumah = Rumah::with(['penduduk', 'kartuKeluarga.anggotaKeluarga'])->get();
+        
+        $rumah = $rumah->map(function($item) {
+            $nama_pemilik = null;
+            
+            if ($item->penduduk) {
+                $nama_pemilik = $item->penduduk->nama_lengkap;
+            } elseif ($item->kartuKeluarga) {
+                $kepalaKeluarga = $item->kartuKeluarga->anggotaKeluarga
+                    ->where('status_hubungan_dalam_keluarga', 'Kepala Keluarga')
+                    ->first();
+                
+                if ($kepalaKeluarga) {
+                    $nama_pemilik = $kepalaKeluarga->nama_lengkap;
+                } else {
+                    $nama_pemilik = "KK: " . $item->kartuKeluarga->nomor_kk;
+                }
+            }
+            
+            $item->nama_pemilik = $nama_pemilik ?: $item->alamat;
+            return $item;
+        });
+
         return response()->json($rumah);
     }
 

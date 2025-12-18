@@ -153,7 +153,7 @@ export default function PolygonDrawer({ onPolygonComplete, color, opacity }: Pol
         >
             <div className="leaflet-control leaflet-bar bg-white p-2 rounded shadow-md">
                 {!isDrawing ? (
-                    <Button onClick={startDrawing} size="sm">
+                    <Button type="button" onClick={startDrawing} size="sm">
                         Mulai Gambar Polygon
                     </Button>
                 ) : (
@@ -163,10 +163,10 @@ export default function PolygonDrawer({ onPolygonComplete, color, opacity }: Pol
                             {points.length >= 3 && <span className="text-green-600 block mt-1">✓ Area valid</span>}
                         </p>
                         <div className="flex gap-2">
-                            <Button onClick={finishDrawing} size="sm" disabled={points.length < 3}>
+                            <Button type="button" onClick={finishDrawing} size="sm" disabled={points.length < 3}>
                                 Selesai
                             </Button>
-                            <Button onClick={cancelDrawing} size="sm" variant="outline">
+                            <Button type="button" onClick={cancelDrawing} size="sm" variant="outline">
                                 Batal
                             </Button>
                         </div>
